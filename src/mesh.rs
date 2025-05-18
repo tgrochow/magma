@@ -1,0 +1,43 @@
+use std::sync::Arc;
+use vulkano::buffer::Buffer;
+use vulkano::buffer::BufferContents;
+use vulkano::buffer::BufferCreateInfo;
+use vulkano::buffer::BufferUsage;
+use vulkano::memory::allocator::AllocationCreateInfo;
+use vulkano::memory::allocator::FreeListAllocator;
+use vulkano::memory::allocator::GenericMemoryAllocator;
+use vulkano::memory::allocator::MemoryTypeFilter;
+use vulkano::pipeline::graphics::vertex_input::Vertex;
+
+#[derive(BufferContents, Vertex)]
+#[repr(C)]
+struct MeshVertex {
+    #[format(R32G32_SFLOAT)]
+    position: [f32; 2],
+}
+
+fn get_test_triangle(memory_allocator: &Arc<GenericMemoryAllocator<FreeListAllocator>>) {
+    let vertex1 = MeshVertex {
+        position: [-0.5, -0.5],
+    };
+    let vertex2 = MeshVertex {
+        position: [0.0, 0.5],
+    };
+    let vertex3 = MeshVertex {
+        position: [0.5, -0.25],
+    };
+    let vertex_buffer = Buffer::from_iter(
+        memory_allocator.clone(),
+        BufferCreateInfo {
+            usage: BufferUsage::VERTEX_BUFFER,
+            ..Default::default()
+        },
+        AllocationCreateInfo {
+            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+            ..Default::default()
+        },
+        vec![vertex1, vertex2, vertex3],
+    )
+    .unwrap();
+}

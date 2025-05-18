@@ -8,3 +8,6 @@ vulkano = "0.35.1"
 vulkano-shaders = "0.35.0"
 vulkano-win = "0.34.0"
 winit = "0.30.10"
+
+[profile.dev]
+opt-level = 1
