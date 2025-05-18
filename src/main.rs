@@ -6,9 +6,12 @@ use vulkano::device::QueueFlags;
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::physical::PhysicalDeviceType;
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
+use vulkano::image::ImageUsage;
 use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
 use vulkano::memory::allocator::StandardMemoryAllocator;
 use vulkano::swapchain::Surface;
+use vulkano::swapchain::Swapchain;
+use vulkano::swapchain::SwapchainCreateInfo;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::ControlFlow;
@@ -30,15 +33,32 @@ impl ApplicationHandler for App {
                 .create_window(Window::default_attributes())
                 .unwrap(),
         );
-        self.window = Some(Arc::new(
-            event_loop
-                .create_window(Window::default_attributes())
-                .unwrap(),
-        ));
         let surface = Surface::from_window(self.instance.clone(), window.clone())
             .expect("surface could not be created");
-        let (device, queue) = init_device(&self.instance, &surface);
-        let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
+        let (physical_device, device, queue) = init_device(&self.instance, &surface);
+        let caps = physical_device
+            .surface_capabilities(&surface, Default::default())
+            .expect("failed to get surface capabilities");
+        let dimensions = window.inner_size();
+        let composite_alpha = caps.supported_composite_alpha.into_iter().next().unwrap();
+        let image_format = physical_device
+            .surface_formats(&surface, Default::default())
+            .unwrap()[0]
+            .0;
+        let (mut swapchain, images) = Swapchain::new(
+            device.clone(),
+            surface.clone(),
+            SwapchainCreateInfo {
+                min_image_count: caps.min_image_count + 1, // How many buffers to use in the swapchain
+                image_format,
+                image_extent: dimensions.into(),
+                image_usage: ImageUsage::COLOR_ATTACHMENT, // What the images are going to be used for
+                composite_alpha,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        // let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
         self.window = Some(window);
     }
 
@@ -97,7 +117,10 @@ fn init_vulkan() -> (Arc<Instance>, EventLoop<()>) {
     (instance, event_loop)
 }
 
-fn init_device(instance: &Arc<Instance>, surface: &Arc<Surface>) -> (Arc<Device>, Arc<Queue>) {
+fn init_device(
+    instance: &Arc<Instance>,
+    surface: &Arc<Surface>,
+) -> (Arc<PhysicalDevice>, Arc<Device>, Arc<Queue>) {
     let device_extensions = DeviceExtensions {
         khr_swapchain: true,
         ..DeviceExtensions::empty()
@@ -105,19 +128,19 @@ fn init_device(instance: &Arc<Instance>, surface: &Arc<Surface>) -> (Arc<Device>
     let (physical_device, queue_family_index) =
         select_physical_device(&instance, &surface, &device_extensions);
     let (device, mut queues) = Device::new(
-        physical_device,
+        physical_device.clone(),
         DeviceCreateInfo {
-            // here we pass the desired queue family to use by index
             queue_create_infos: vec![QueueCreateInfo {
                 queue_family_index,
                 ..Default::default()
             }],
+            enabled_extensions: device_extensions,
             ..Default::default()
         },
     )
     .expect("failed to create device");
     let queue = queues.next().unwrap();
-    (device, queue)
+    (physical_device, device, queue)
 }
 
 fn select_physical_device(
