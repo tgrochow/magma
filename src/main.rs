@@ -1,7 +1,10 @@
 use std::sync::Arc;
 use vulkano::VulkanLibrary;
+use vulkano::device::DeviceExtensions;
 use vulkano::device::Queue;
 use vulkano::device::QueueFlags;
+use vulkano::device::physical::PhysicalDevice;
+use vulkano::device::physical::PhysicalDeviceType;
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
 use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
 use vulkano::memory::allocator::StandardMemoryAllocator;
@@ -15,18 +18,28 @@ use winit::window::{Window, WindowId};
 mod mesh;
 mod render;
 
-#[derive(Default)]
 struct App {
-    window: Option<Window>,
+    window: Option<Arc<Window>>,
+    instance: Arc<Instance>,
 }
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        self.window = Some(
+        let window = Arc::new(
             event_loop
                 .create_window(Window::default_attributes())
                 .unwrap(),
         );
+        self.window = Some(Arc::new(
+            event_loop
+                .create_window(Window::default_attributes())
+                .unwrap(),
+        ));
+        let surface = Surface::from_window(self.instance.clone(), window.clone())
+            .expect("surface could not be created");
+        let (device, queue) = init_device(&self.instance, &surface);
+        let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
+        self.window = Some(window);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
@@ -58,9 +71,10 @@ impl ApplicationHandler for App {
 
 fn main() {
     let (instance, event_loop) = init_vulkan();
-    let (device, queue) = init_device(&instance);
-    let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
-    let mut app = App::default();
+    let mut app = App {
+        window: None,
+        instance: instance,
+    };
     event_loop.run_app(&mut app).expect("fuck");
 }
 
@@ -83,22 +97,13 @@ fn init_vulkan() -> (Arc<Instance>, EventLoop<()>) {
     (instance, event_loop)
 }
 
-fn init_device(instance: &Arc<Instance>) -> (Arc<Device>, Arc<Queue>) {
-    let physical_device = instance
-        .enumerate_physical_devices()
-        .expect("could not enumerate devices")
-        .next()
-        .expect("no devices available");
-    let queue_family_index = physical_device
-        .queue_family_properties()
-        .iter()
-        .enumerate()
-        .position(|(_queue_family_index, queue_family_properties)| {
-            queue_family_properties
-                .queue_flags
-                .contains(QueueFlags::GRAPHICS)
-        })
-        .expect("couldn't find a graphical queue family") as u32;
+fn init_device(instance: &Arc<Instance>, surface: &Arc<Surface>) -> (Arc<Device>, Arc<Queue>) {
+    let device_extensions = DeviceExtensions {
+        khr_swapchain: true,
+        ..DeviceExtensions::empty()
+    };
+    let (physical_device, queue_family_index) =
+        select_physical_device(&instance, &surface, &device_extensions);
     let (device, mut queues) = Device::new(
         physical_device,
         DeviceCreateInfo {
@@ -113,4 +118,40 @@ fn init_device(instance: &Arc<Instance>) -> (Arc<Device>, Arc<Queue>) {
     .expect("failed to create device");
     let queue = queues.next().unwrap();
     (device, queue)
+}
+
+fn select_physical_device(
+    instance: &Arc<Instance>,
+    surface: &Arc<Surface>,
+    device_extensions: &DeviceExtensions,
+) -> (Arc<PhysicalDevice>, u32) {
+    instance
+        .enumerate_physical_devices()
+        .expect("could not enumerate devices")
+        .filter(|p| p.supported_extensions().contains(&device_extensions))
+        .filter_map(|p| {
+            p.queue_family_properties()
+                .iter()
+                .enumerate()
+                // Find the first first queue family that is suitable.
+                // If none is found, `None` is returned to `filter_map`,
+                // which disqualifies this physical device.
+                .position(|(i, q)| {
+                    q.queue_flags.contains(QueueFlags::GRAPHICS)
+                        && p.surface_support(i as u32, &surface).unwrap_or(false)
+                })
+                .map(|q| (p, q as u32))
+        })
+        .min_by_key(|(p, _)| match p.properties().device_type {
+            PhysicalDeviceType::DiscreteGpu => 0,
+            PhysicalDeviceType::IntegratedGpu => 1,
+            PhysicalDeviceType::VirtualGpu => 2,
+            PhysicalDeviceType::Cpu => 3,
+
+            // Note that there exists `PhysicalDeviceType::Other`, however,
+            // `PhysicalDeviceType` is a non-exhaustive enum. Thus, one should
+            // match wildcard `_` to catch all unknown device types.
+            _ => 4,
+        })
+        .expect("no device available")
 }
