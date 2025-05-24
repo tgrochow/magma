@@ -3,6 +3,7 @@ use vulkano::buffer::Buffer;
 use vulkano::buffer::BufferContents;
 use vulkano::buffer::BufferCreateInfo;
 use vulkano::buffer::BufferUsage;
+use vulkano::buffer::Subbuffer;
 use vulkano::memory::allocator::AllocationCreateInfo;
 use vulkano::memory::allocator::FreeListAllocator;
 use vulkano::memory::allocator::GenericMemoryAllocator;
@@ -11,12 +12,14 @@ use vulkano::pipeline::graphics::vertex_input::Vertex;
 
 #[derive(BufferContents, Vertex)]
 #[repr(C)]
-struct MeshVertex {
+pub struct MeshVertex {
     #[format(R32G32_SFLOAT)]
     position: [f32; 2],
 }
 
-fn get_test_triangle(memory_allocator: &Arc<GenericMemoryAllocator<FreeListAllocator>>) {
+pub fn get_test_triangle(
+    memory_allocator: &Arc<GenericMemoryAllocator<FreeListAllocator>>,
+) -> Subbuffer<[MeshVertex]> {
     let vertex1 = MeshVertex {
         position: [-0.5, -0.5],
     };
@@ -26,7 +29,7 @@ fn get_test_triangle(memory_allocator: &Arc<GenericMemoryAllocator<FreeListAlloc
     let vertex3 = MeshVertex {
         position: [0.5, -0.25],
     };
-    let vertex_buffer = Buffer::from_iter(
+    return Buffer::from_iter(
         memory_allocator.clone(),
         BufferCreateInfo {
             usage: BufferUsage::VERTEX_BUFFER,
