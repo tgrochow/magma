@@ -63,8 +63,16 @@ mod shader;
 // }
 
 struct App {
-    window: Option<Arc<Window>>,
     instance: Arc<Instance>,
+    render_state: Option<RenderState>,
+}
+
+struct RenderState {
+    window: Arc<Window>,
+    swapchain: Arc<Swapchain>,
+    render_pass: Arc<RenderPass>,
+    window_resized: bool,
+    recreate_swapchain: bool,
 }
 
 impl ApplicationHandler for App {
@@ -86,7 +94,7 @@ impl ApplicationHandler for App {
             .surface_formats(&surface, Default::default())
             .unwrap()[0]
             .0;
-        let (mut swapchain, images) = Swapchain::new(
+        let (mut sc, images) = Swapchain::new(
             device.clone(),
             surface.clone(),
             SwapchainCreateInfo {
@@ -99,7 +107,7 @@ impl ApplicationHandler for App {
             },
         )
         .unwrap();
-        let render_pass = get_render_pass(device.clone(), &swapchain);
+        let render_pass = get_render_pass(device.clone(), &sc);
         let framebuffers = get_framebuffers(&images, &render_pass);
         let vs = shader::vs::load(device.clone()).expect("failed to create shader module");
         let fs = shader::fs::load(device.clone()).expect("failed to create shader module");
@@ -128,8 +136,13 @@ impl ApplicationHandler for App {
             &framebuffers,
             &vertex_buffer,
         );
-
-        self.window = Some(window);
+        self.render_state = Some(RenderState {
+            window: window,
+            swapchain: sc,
+            render_pass: render_pass,
+            window_resized: false,
+            recreate_swapchain: false,
+        });
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
@@ -138,7 +151,28 @@ impl ApplicationHandler for App {
                 println!("The close button was pressed; stopping");
                 event_loop.exit();
             }
+            WindowEvent::Resized(_) => {
+                let render_state = self.render_state.as_mut().unwrap();
+                render_state.window_resized = true;
+            }
             WindowEvent::RedrawRequested => {
+                let render_state = self.render_state.as_mut().unwrap();
+                if render_state.recreate_swapchain {
+                    render_state.recreate_swapchain = false;
+
+                    let new_dimensions = render_state.window.inner_size();
+
+                    let (new_swapchain, new_images) = render_state
+                        .swapchain
+                        .recreate(SwapchainCreateInfo {
+                            // Here, `image_extend` will correspond to the window dimensions.
+                            image_extent: new_dimensions.into(),
+                            ..render_state.swapchain.create_info()
+                        })
+                        .expect("failed to recreate swapchain: {e}");
+                    render_state.swapchain = new_swapchain;
+                    let new_framebuffers = get_framebuffers(&new_images, &render_state.render_pass);
+                }
                 // Redraw the application.
                 //
                 // It's preferable for applications that do not render continuously to render in
@@ -152,7 +186,7 @@ impl ApplicationHandler for App {
                 // You only need to call this if you've determined that you need to redraw in
                 // applications which do not always need to. Applications that redraw continuously
                 // can render here instead.
-                self.window.as_ref().unwrap().request_redraw();
+                self.render_state.as_ref().unwrap().window.request_redraw();
             }
             _ => (),
         }
@@ -162,8 +196,8 @@ impl ApplicationHandler for App {
 fn main() {
     let (instance, event_loop) = init_vulkan();
     let mut app = App {
-        window: None,
         instance: instance,
+        render_state: None,
     };
     event_loop.run_app(&mut app).expect("fuck");
 }
