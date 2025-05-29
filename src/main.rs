@@ -1,7 +1,6 @@
 use mesh::MeshVertex;
 use std::sync::Arc;
 use vulkano::VulkanLibrary;
-use vulkano::buffer::BufferContents;
 use vulkano::buffer::Subbuffer;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
 use vulkano::command_buffer::CommandBufferUsage;
@@ -32,7 +31,6 @@ use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::multisample::MultisampleState;
 use vulkano::pipeline::graphics::rasterization::RasterizationState;
 use vulkano::pipeline::graphics::vertex_input::Vertex;
-use vulkano::pipeline::graphics::vertex_input::VertexBufferDescription;
 use vulkano::pipeline::graphics::vertex_input::VertexDefinition;
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::pipeline::graphics::viewport::ViewportState;
@@ -42,9 +40,14 @@ use vulkano::render_pass::FramebufferCreateInfo;
 use vulkano::render_pass::RenderPass;
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
+use vulkano::swapchain;
 use vulkano::swapchain::Surface;
 use vulkano::swapchain::Swapchain;
 use vulkano::swapchain::SwapchainCreateInfo;
+use vulkano::swapchain::SwapchainPresentInfo;
+use vulkano::sync;
+use vulkano::sync::GpuFuture;
+use vulkano::{Validated, VulkanError};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::ControlFlow;
@@ -55,13 +58,6 @@ mod mesh;
 mod render;
 mod shader;
 
-// #[derive(BufferContents, Vertex)]
-// #[repr(C)]
-// pub struct MyVertex {
-//     #[format(R32G32_SFLOAT)]
-//     position: [f32; 2],
-// }
-
 struct App {
     instance: Arc<Instance>,
     render_state: Option<RenderState>,
@@ -69,8 +65,11 @@ struct App {
 
 struct RenderState {
     window: Arc<Window>,
+    device: Arc<Device>,
+    queue: Arc<Queue>,
     swapchain: Arc<Swapchain>,
     render_pass: Arc<RenderPass>,
+    command_buffers: Vec<Arc<PrimaryAutoCommandBuffer>>,
     window_resized: bool,
     recreate_swapchain: bool,
 }
@@ -94,7 +93,7 @@ impl ApplicationHandler for App {
             .surface_formats(&surface, Default::default())
             .unwrap()[0]
             .0;
-        let (mut sc, images) = Swapchain::new(
+        let (sc, images) = Swapchain::new(
             device.clone(),
             surface.clone(),
             SwapchainCreateInfo {
@@ -111,7 +110,7 @@ impl ApplicationHandler for App {
         let framebuffers = get_framebuffers(&images, &render_pass);
         let vs = shader::vs::load(device.clone()).expect("failed to create shader module");
         let fs = shader::fs::load(device.clone()).expect("failed to create shader module");
-        let mut viewport = Viewport {
+        let viewport = Viewport {
             offset: [0.0, 0.0],
             extent: window.inner_size().into(),
             depth_range: 0.0..=1.0,
@@ -129,7 +128,7 @@ impl ApplicationHandler for App {
         ));
         let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
         let vertex_buffer = mesh::get_test_triangle(&memory_allocator);
-        let mut command_buffers = get_command_buffers(
+        let command_buffers = get_command_buffers(
             command_buffer_allocator,
             &queue,
             &pipeline,
@@ -138,8 +137,11 @@ impl ApplicationHandler for App {
         );
         self.render_state = Some(RenderState {
             window: window,
+            device: device,
+            queue: queue,
             swapchain: sc,
             render_pass: render_pass,
+            command_buffers: command_buffers,
             window_resized: false,
             recreate_swapchain: false,
         });
@@ -186,7 +188,37 @@ impl ApplicationHandler for App {
                 // You only need to call this if you've determined that you need to redraw in
                 // applications which do not always need to. Applications that redraw continuously
                 // can render here instead.
-                self.render_state.as_ref().unwrap().window.request_redraw();
+                let (image_i, suboptimal, acquire_future) =
+                    match swapchain::acquire_next_image(render_state.swapchain.clone(), None)
+                        .map_err(Validated::unwrap)
+                    {
+                        Ok(r) => r,
+                        Err(VulkanError::OutOfDate) => {
+                            render_state.recreate_swapchain = true;
+                            return;
+                        }
+                        Err(e) => panic!("failed to acquire next image: {e}"),
+                    };
+                if suboptimal {
+                    render_state.recreate_swapchain = true;
+                }
+                let execution = sync::now(render_state.device.clone())
+                    .join(acquire_future)
+                    .then_execute(
+                        render_state.queue.clone(),
+                        render_state.command_buffers[image_i as usize].clone(),
+                    )
+                    .unwrap()
+                    .then_swapchain_present(
+                        render_state.queue.clone(),
+                        SwapchainPresentInfo::swapchain_image_index(
+                            render_state.swapchain.clone(),
+                            image_i,
+                        ),
+                    )
+                    .then_signal_fence_and_flush();
+
+                render_state.window.request_redraw();
             }
             _ => (),
         }
