@@ -9,6 +9,9 @@ use vulkano::memory::allocator::FreeListAllocator;
 use vulkano::memory::allocator::GenericMemoryAllocator;
 use vulkano::memory::allocator::MemoryTypeFilter;
 use vulkano::pipeline::graphics::vertex_input::Vertex;
+use vulkano::pipeline::graphics::vertex_input::VertexDefinition;
+use vulkano::pipeline::graphics::vertex_input::VertexInputState;
+use vulkano::shader::EntryPoint;
 
 #[derive(BufferContents, Vertex)]
 #[repr(C)]
@@ -43,4 +46,8 @@ pub fn get_test_triangle(
         vec![vertex1, vertex2, vertex3],
     )
     .unwrap();
+}
+
+pub fn get_vertex_input_state(entry_point: &EntryPoint) -> VertexInputState {
+    return MeshVertex::per_vertex().definition(&entry_point).unwrap();
 }
