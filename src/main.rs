@@ -3,6 +3,7 @@ use std::sync::Arc;
 use vulkano::VulkanLibrary;
 use vulkano::buffer::Subbuffer;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
+use vulkano::command_buffer::CommandBufferExecFuture;
 use vulkano::command_buffer::CommandBufferUsage;
 use vulkano::command_buffer::PrimaryAutoCommandBuffer;
 use vulkano::command_buffer::RenderPassBeginInfo;
@@ -41,12 +42,16 @@ use vulkano::render_pass::RenderPass;
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 use vulkano::swapchain;
+use vulkano::swapchain::PresentFuture;
 use vulkano::swapchain::Surface;
 use vulkano::swapchain::Swapchain;
+use vulkano::swapchain::SwapchainAcquireFuture;
 use vulkano::swapchain::SwapchainCreateInfo;
 use vulkano::swapchain::SwapchainPresentInfo;
 use vulkano::sync;
 use vulkano::sync::GpuFuture;
+use vulkano::sync::future::FenceSignalFuture;
+use vulkano::sync::future::JoinFuture;
 use vulkano::{Validated, VulkanError};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -70,6 +75,20 @@ struct RenderState {
     swapchain: Arc<Swapchain>,
     render_pass: Arc<RenderPass>,
     command_buffers: Vec<Arc<PrimaryAutoCommandBuffer>>,
+    fences: Vec<
+        Option<
+            Arc<
+                FenceSignalFuture<
+                    PresentFuture<
+                        CommandBufferExecFuture<
+                            JoinFuture<Box<dyn GpuFuture + 'static>, SwapchainAcquireFuture>,
+                        >,
+                    >,
+                >,
+            >,
+        >,
+    >,
+    previous_fence_i: u32,
     window_resized: bool,
     recreate_swapchain: bool,
 }
@@ -135,6 +154,7 @@ impl ApplicationHandler for App {
             &framebuffers,
             &vertex_buffer,
         );
+        let frames_in_flight = images.len();
         self.render_state = Some(RenderState {
             window: window,
             device: device,
@@ -142,6 +162,8 @@ impl ApplicationHandler for App {
             swapchain: sc,
             render_pass: render_pass,
             command_buffers: command_buffers,
+            fences: vec![None; frames_in_flight],
+            previous_fence_i: 0,
             window_resized: false,
             recreate_swapchain: false,
         });
@@ -202,7 +224,25 @@ impl ApplicationHandler for App {
                 if suboptimal {
                     render_state.recreate_swapchain = true;
                 }
-                let execution = sync::now(render_state.device.clone())
+                // Wait for the fence related to this image to finish. Normally this would be the
+                // oldest fence that most likely has already finished.
+                if let Some(image_fence) = &render_state.fences[image_i as usize] {
+                    image_fence.wait(None).unwrap();
+                }
+                let previous_future =
+                    match render_state.fences[render_state.previous_fence_i as usize].clone() {
+                        // Create a `NowFuture`.
+                        None => {
+                            let mut now = sync::now(render_state.device.clone());
+                            now.cleanup_finished();
+
+                            now.boxed()
+                        }
+                        // Use the existing `FenceSignalFuture`.
+                        Some(fence) => fence.boxed(),
+                    };
+
+                let future = previous_future
                     .join(acquire_future)
                     .then_execute(
                         render_state.queue.clone(),
@@ -217,7 +257,18 @@ impl ApplicationHandler for App {
                         ),
                     )
                     .then_signal_fence_and_flush();
-
+                render_state.fences[image_i as usize] = match future.map_err(Validated::unwrap) {
+                    Ok(value) => Some(Arc::new(value)),
+                    Err(VulkanError::OutOfDate) => {
+                        render_state.recreate_swapchain = true;
+                        None
+                    }
+                    Err(e) => {
+                        println!("failed to flush future: {e}");
+                        None
+                    }
+                };
+                render_state.previous_fence_i = image_i;
                 render_state.window.request_redraw();
             }
             _ => (),
