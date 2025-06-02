@@ -3,7 +3,6 @@ use std::sync::Arc;
 use vulkano::VulkanLibrary;
 use vulkano::buffer::Subbuffer;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
-use vulkano::command_buffer::CommandBufferExecFuture;
 use vulkano::command_buffer::CommandBufferUsage;
 use vulkano::command_buffer::PrimaryAutoCommandBuffer;
 use vulkano::command_buffer::RenderPassBeginInfo;
@@ -17,9 +16,7 @@ use vulkano::device::QueueFlags;
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::physical::PhysicalDeviceType;
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
-use vulkano::image::Image;
 use vulkano::image::ImageUsage;
-use vulkano::image::view::ImageView;
 use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
 use vulkano::memory::allocator::StandardMemoryAllocator;
 use vulkano::pipeline::GraphicsPipeline;
@@ -37,21 +34,16 @@ use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::pipeline::graphics::viewport::ViewportState;
 use vulkano::pipeline::layout::PipelineDescriptorSetLayoutCreateInfo;
 use vulkano::render_pass::Framebuffer;
-use vulkano::render_pass::FramebufferCreateInfo;
 use vulkano::render_pass::RenderPass;
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 use vulkano::swapchain;
-use vulkano::swapchain::PresentFuture;
 use vulkano::swapchain::Surface;
 use vulkano::swapchain::Swapchain;
-use vulkano::swapchain::SwapchainAcquireFuture;
 use vulkano::swapchain::SwapchainCreateInfo;
 use vulkano::swapchain::SwapchainPresentInfo;
 use vulkano::sync;
 use vulkano::sync::GpuFuture;
-use vulkano::sync::future::FenceSignalFuture;
-use vulkano::sync::future::JoinFuture;
 use vulkano::{Validated, VulkanError};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -65,37 +57,7 @@ mod shader;
 
 struct App {
     instance: Arc<Instance>,
-    render_state: Option<RenderState>,
-}
-
-struct RenderState {
-    window: Arc<Window>,
-    device: Arc<Device>,
-    queue: Arc<Queue>,
-    viewport: Viewport,
-    vs: Arc<ShaderModule>,
-    fs: Arc<ShaderModule>,
-    render_pass: Arc<RenderPass>,
-    command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
-    vertex_buffer: Subbuffer<[MeshVertex]>,
-    command_buffers: Vec<Arc<PrimaryAutoCommandBuffer>>,
-    swapchain: Arc<Swapchain>,
-    fences: Vec<
-        Option<
-            Arc<
-                FenceSignalFuture<
-                    PresentFuture<
-                        CommandBufferExecFuture<
-                            JoinFuture<Box<dyn GpuFuture + 'static>, SwapchainAcquireFuture>,
-                        >,
-                    >,
-                >,
-            >,
-        >,
-    >,
-    previous_fence_i: u32,
-    window_resized: bool,
-    recreate_swapchain: bool,
+    render_state: Option<render::RenderState>,
 }
 
 impl ApplicationHandler for App {
@@ -130,8 +92,8 @@ impl ApplicationHandler for App {
             },
         )
         .unwrap();
-        let render_pass = get_render_pass(device.clone(), &sc);
-        let framebuffers = get_framebuffers(&images, &render_pass);
+        let render_pass = render::get_render_pass(device.clone(), &sc);
+        let framebuffers = render::get_framebuffers(&images, &render_pass);
         let vs = shader::vs::load(device.clone()).expect("failed to create shader module");
         let fs = shader::fs::load(device.clone()).expect("failed to create shader module");
         let viewport = Viewport {
@@ -160,7 +122,7 @@ impl ApplicationHandler for App {
             &vertex_buffer,
         );
         let frames_in_flight = images.len();
-        self.render_state = Some(RenderState {
+        self.render_state = Some(render::RenderState {
             window: window,
             device: device,
             queue: queue,
@@ -206,7 +168,7 @@ impl ApplicationHandler for App {
                     if render_state.window_resized {
                         render_state.window_resized = false;
                         let new_framebuffers =
-                            get_framebuffers(&new_images, &render_state.render_pass);
+                            render::get_framebuffers(&new_images, &render_state.render_pass);
                         render_state.viewport.extent = new_dimensions.into();
                         let new_pipeline = get_pipeline(
                             render_state.device.clone(),
@@ -391,43 +353,6 @@ fn select_physical_device(
             _ => 4,
         })
         .expect("no device available")
-}
-
-fn get_render_pass(device: Arc<Device>, swapchain: &Arc<Swapchain>) -> Arc<RenderPass> {
-    vulkano::single_pass_renderpass!(
-        device,
-        attachments: {
-            color: {
-                // Set the format the same as the swapchain.
-                format: swapchain.image_format(),
-                samples: 1,
-                load_op: Clear,
-                store_op: Store,
-            },
-        },
-        pass: {
-            color: [color],
-            depth_stencil: {},
-        },
-    )
-    .unwrap()
-}
-
-fn get_framebuffers(images: &[Arc<Image>], render_pass: &Arc<RenderPass>) -> Vec<Arc<Framebuffer>> {
-    images
-        .iter()
-        .map(|image| {
-            let view = ImageView::new_default(image.clone()).unwrap();
-            Framebuffer::new(
-                render_pass.clone(),
-                FramebufferCreateInfo {
-                    attachments: vec![view],
-                    ..Default::default()
-                },
-            )
-            .unwrap()
-        })
-        .collect::<Vec<_>>()
 }
 
 fn get_pipeline(
