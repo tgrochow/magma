@@ -72,9 +72,14 @@ struct RenderState {
     window: Arc<Window>,
     device: Arc<Device>,
     queue: Arc<Queue>,
-    swapchain: Arc<Swapchain>,
+    viewport: Viewport,
+    vs: Arc<ShaderModule>,
+    fs: Arc<ShaderModule>,
     render_pass: Arc<RenderPass>,
+    command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
+    vertex_buffer: Subbuffer<[MeshVertex]>,
     command_buffers: Vec<Arc<PrimaryAutoCommandBuffer>>,
+    swapchain: Arc<Swapchain>,
     fences: Vec<
         Option<
             Arc<
@@ -148,7 +153,7 @@ impl ApplicationHandler for App {
         let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
         let vertex_buffer = mesh::get_test_triangle(&memory_allocator);
         let command_buffers = get_command_buffers(
-            command_buffer_allocator,
+            &command_buffer_allocator,
             &queue,
             &pipeline,
             &framebuffers,
@@ -159,8 +164,13 @@ impl ApplicationHandler for App {
             window: window,
             device: device,
             queue: queue,
+            viewport: viewport,
+            vs: vs,
+            fs: fs,
             swapchain: sc,
             render_pass: render_pass,
+            command_buffer_allocator: command_buffer_allocator,
+            vertex_buffer: vertex_buffer,
             command_buffers: command_buffers,
             fences: vec![None; frames_in_flight],
             previous_fence_i: 0,
@@ -169,7 +179,7 @@ impl ApplicationHandler for App {
         });
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => {
                 println!("The close button was pressed; stopping");
@@ -181,11 +191,9 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 let render_state = self.render_state.as_mut().unwrap();
-                if render_state.recreate_swapchain {
+                if render_state.window_resized || render_state.recreate_swapchain {
                     render_state.recreate_swapchain = false;
-
                     let new_dimensions = render_state.window.inner_size();
-
                     let (new_swapchain, new_images) = render_state
                         .swapchain
                         .recreate(SwapchainCreateInfo {
@@ -195,7 +203,26 @@ impl ApplicationHandler for App {
                         })
                         .expect("failed to recreate swapchain: {e}");
                     render_state.swapchain = new_swapchain;
-                    let new_framebuffers = get_framebuffers(&new_images, &render_state.render_pass);
+                    if render_state.window_resized {
+                        render_state.window_resized = false;
+                        let new_framebuffers =
+                            get_framebuffers(&new_images, &render_state.render_pass);
+                        render_state.viewport.extent = new_dimensions.into();
+                        let new_pipeline = get_pipeline(
+                            render_state.device.clone(),
+                            render_state.vs.clone(),
+                            render_state.fs.clone(),
+                            render_state.render_pass.clone(),
+                            render_state.viewport.clone(),
+                        );
+                        render_state.command_buffers = get_command_buffers(
+                            &render_state.command_buffer_allocator,
+                            &render_state.queue,
+                            &new_pipeline,
+                            &new_framebuffers,
+                            &render_state.vertex_buffer,
+                        );
+                    }
                 }
                 // Redraw the application.
                 //
@@ -450,7 +477,7 @@ fn get_pipeline(
 }
 
 fn get_command_buffers(
-    command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
+    command_buffer_allocator: &Arc<StandardCommandBufferAllocator>,
     queue: &Arc<Queue>,
     pipeline: &Arc<GraphicsPipeline>,
     framebuffers: &Vec<Arc<Framebuffer>>,
