@@ -1,6 +1,9 @@
-use crate::mesh;
 use crate::mesh::MeshVertex;
+use crate::{device, mesh, render, shader};
 use std::sync::Arc;
+use vulkano::image::ImageUsage;
+use vulkano::memory::allocator::StandardMemoryAllocator;
+use vulkano::swapchain::SwapchainCreateInfo;
 use vulkano::{
     buffer::Subbuffer,
     command_buffer::{
@@ -10,6 +13,7 @@ use vulkano::{
     },
     device::{Device, Queue},
     image::{Image, view::ImageView},
+    instance::Instance,
     pipeline::{
         GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
         graphics::{
@@ -24,7 +28,7 @@ use vulkano::{
     },
     render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass},
     shader::ShaderModule,
-    swapchain::{PresentFuture, Swapchain, SwapchainAcquireFuture},
+    swapchain::{PresentFuture, Surface, Swapchain, SwapchainAcquireFuture},
     sync::{
         GpuFuture,
         future::{FenceSignalFuture, JoinFuture},
@@ -60,6 +64,81 @@ pub struct RenderState {
     pub previous_fence_i: u32,
     pub window_resized: bool,
     pub recreate_swapchain: bool,
+}
+
+pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> RenderState {
+    let surface = Surface::from_window(instance.clone(), window.clone())
+        .expect("surface could not be created");
+    let (physical_device, device, queue) = device::init_device(instance, &surface);
+    let caps = physical_device
+        .surface_capabilities(&surface, Default::default())
+        .expect("failed to get surface capabilities");
+    let dimensions = window.inner_size();
+    let composite_alpha = caps.supported_composite_alpha.into_iter().next().unwrap();
+    let image_format = physical_device
+        .surface_formats(&surface, Default::default())
+        .unwrap()[0]
+        .0;
+    let (sc, images) = Swapchain::new(
+        device.clone(),
+        surface.clone(),
+        SwapchainCreateInfo {
+            min_image_count: caps.min_image_count + 1, // How many buffers to use in the swapchain
+            image_format,
+            image_extent: dimensions.into(),
+            image_usage: ImageUsage::COLOR_ATTACHMENT, // What the images are going to be used for
+            composite_alpha,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let render_pass = render::get_render_pass(device.clone(), &sc);
+    let framebuffers = render::get_framebuffers(&images, &render_pass);
+    let vs = shader::vs::load(device.clone()).expect("failed to create shader module");
+    let fs = shader::fs::load(device.clone()).expect("failed to create shader module");
+    let viewport = Viewport {
+        offset: [0.0, 0.0],
+        extent: window.inner_size().into(),
+        depth_range: 0.0..=1.0,
+    };
+    let pipeline = render::get_pipeline(
+        device.clone(),
+        vs.clone(),
+        fs.clone(),
+        render_pass.clone(),
+        viewport.clone(),
+    );
+    let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
+        device.clone(),
+        Default::default(),
+    ));
+    let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
+    let vertex_buffer = mesh::get_test_triangle(&memory_allocator);
+    let command_buffers = render::get_command_buffers(
+        &command_buffer_allocator,
+        &queue,
+        &pipeline,
+        &framebuffers,
+        &vertex_buffer,
+    );
+    let frames_in_flight = images.len();
+    return RenderState {
+        window: window,
+        device: device,
+        queue: queue,
+        viewport: viewport,
+        vs: vs,
+        fs: fs,
+        swapchain: sc,
+        render_pass: render_pass,
+        command_buffer_allocator: command_buffer_allocator,
+        vertex_buffer: vertex_buffer,
+        command_buffers: command_buffers,
+        fences: vec![None; frames_in_flight],
+        previous_fence_i: 0,
+        window_resized: false,
+        recreate_swapchain: false,
+    };
 }
 
 pub fn get_render_pass(device: Arc<Device>, swapchain: &Arc<Swapchain>) -> Arc<RenderPass> {

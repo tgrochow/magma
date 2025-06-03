@@ -1,14 +1,8 @@
 use std::sync::Arc;
 use vulkano::VulkanLibrary;
-use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
-
-use vulkano::image::ImageUsage;
 use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
-use vulkano::memory::allocator::StandardMemoryAllocator;
-use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::swapchain;
 use vulkano::swapchain::Surface;
-use vulkano::swapchain::Swapchain;
 use vulkano::swapchain::SwapchainCreateInfo;
 use vulkano::swapchain::SwapchainPresentInfo;
 use vulkano::sync;
@@ -37,78 +31,7 @@ impl ApplicationHandler for App {
                 .create_window(Window::default_attributes())
                 .unwrap(),
         );
-        let surface = Surface::from_window(self.instance.clone(), window.clone())
-            .expect("surface could not be created");
-        let (physical_device, device, queue) = device::init_device(&self.instance, &surface);
-        let caps = physical_device
-            .surface_capabilities(&surface, Default::default())
-            .expect("failed to get surface capabilities");
-        let dimensions = window.inner_size();
-        let composite_alpha = caps.supported_composite_alpha.into_iter().next().unwrap();
-        let image_format = physical_device
-            .surface_formats(&surface, Default::default())
-            .unwrap()[0]
-            .0;
-        let (sc, images) = Swapchain::new(
-            device.clone(),
-            surface.clone(),
-            SwapchainCreateInfo {
-                min_image_count: caps.min_image_count + 1, // How many buffers to use in the swapchain
-                image_format,
-                image_extent: dimensions.into(),
-                image_usage: ImageUsage::COLOR_ATTACHMENT, // What the images are going to be used for
-                composite_alpha,
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        let render_pass = render::get_render_pass(device.clone(), &sc);
-        let framebuffers = render::get_framebuffers(&images, &render_pass);
-        let vs = shader::vs::load(device.clone()).expect("failed to create shader module");
-        let fs = shader::fs::load(device.clone()).expect("failed to create shader module");
-        let viewport = Viewport {
-            offset: [0.0, 0.0],
-            extent: window.inner_size().into(),
-            depth_range: 0.0..=1.0,
-        };
-        let pipeline = render::get_pipeline(
-            device.clone(),
-            vs.clone(),
-            fs.clone(),
-            render_pass.clone(),
-            viewport.clone(),
-        );
-        let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
-            device.clone(),
-            Default::default(),
-        ));
-        let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
-        let vertex_buffer = mesh::get_test_triangle(&memory_allocator);
-        let command_buffers = render::get_command_buffers(
-            &command_buffer_allocator,
-            &queue,
-            &pipeline,
-            &framebuffers,
-            &vertex_buffer,
-        );
-        let frames_in_flight = images.len();
-        self.render_state = Some(render::RenderState {
-            window: window,
-            device: device,
-            queue: queue,
-            viewport: viewport,
-            vs: vs,
-            fs: fs,
-            swapchain: sc,
-            render_pass: render_pass,
-            command_buffer_allocator: command_buffer_allocator,
-            vertex_buffer: vertex_buffer,
-            command_buffers: command_buffers,
-            fences: vec![None; frames_in_flight],
-            previous_fence_i: 0,
-            window_resized: false,
-            recreate_swapchain: false,
-        });
+        self.render_state = Some(render::init(&self.instance, window));
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
