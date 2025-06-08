@@ -3,7 +3,6 @@ use vulkano::VulkanLibrary;
 use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
 use vulkano::swapchain;
 use vulkano::swapchain::Surface;
-use vulkano::swapchain::SwapchainCreateInfo;
 use vulkano::swapchain::SwapchainPresentInfo;
 use vulkano::sync;
 use vulkano::sync::GpuFuture;
@@ -46,39 +45,7 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 let render_state = self.render_state.as_mut().unwrap();
-                if render_state.window_resized || render_state.recreate_swapchain {
-                    render_state.recreate_swapchain = false;
-                    let new_dimensions = render_state.window.inner_size();
-                    let (new_swapchain, new_images) = render_state
-                        .swapchain
-                        .recreate(SwapchainCreateInfo {
-                            // Here, `image_extend` will correspond to the window dimensions.
-                            image_extent: new_dimensions.into(),
-                            ..render_state.swapchain.create_info()
-                        })
-                        .expect("failed to recreate swapchain: {e}");
-                    render_state.swapchain = new_swapchain;
-                    if render_state.window_resized {
-                        render_state.window_resized = false;
-                        let new_framebuffers =
-                            render::get_framebuffers(&new_images, &render_state.render_pass);
-                        render_state.viewport.extent = new_dimensions.into();
-                        let new_pipeline = render::get_pipeline(
-                            render_state.device.clone(),
-                            render_state.vs.clone(),
-                            render_state.fs.clone(),
-                            render_state.render_pass.clone(),
-                            render_state.viewport.clone(),
-                        );
-                        render_state.command_buffers = render::get_command_buffers(
-                            &render_state.command_buffer_allocator,
-                            &render_state.queue,
-                            &new_pipeline,
-                            &new_framebuffers,
-                            &render_state.vertex_buffer,
-                        );
-                    }
-                }
+                render_state.window_resized();
                 // Redraw the application.
                 //
                 // It's preferable for applications that do not render continuously to render in

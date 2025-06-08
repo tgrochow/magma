@@ -66,6 +66,43 @@ pub struct RenderState {
     pub recreate_swapchain: bool,
 }
 
+impl RenderState {
+    pub fn window_resized(&mut self) {
+        if self.window_resized || self.recreate_swapchain {
+            self.recreate_swapchain = false;
+            let new_dimensions = self.window.inner_size();
+            let (new_swapchain, new_images) = self
+                .swapchain
+                .recreate(SwapchainCreateInfo {
+                    // Here, `image_extend` will correspond to the window dimensions.
+                    image_extent: new_dimensions.into(),
+                    ..self.swapchain.create_info()
+                })
+                .expect("failed to recreate swapchain: {e}");
+            self.swapchain = new_swapchain;
+            if self.window_resized {
+                self.window_resized = false;
+                let new_framebuffers = render::get_framebuffers(&new_images, &self.render_pass);
+                self.viewport.extent = new_dimensions.into();
+                let new_pipeline = render::get_pipeline(
+                    self.device.clone(),
+                    self.vs.clone(),
+                    self.fs.clone(),
+                    self.render_pass.clone(),
+                    self.viewport.clone(),
+                );
+                self.command_buffers = render::get_command_buffers(
+                    &self.command_buffer_allocator,
+                    &self.queue,
+                    &new_pipeline,
+                    &new_framebuffers,
+                    &self.vertex_buffer,
+                );
+            }
+        }
+    }
+}
+
 pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> RenderState {
     let surface = Surface::from_window(instance.clone(), window.clone())
         .expect("surface could not be created");
