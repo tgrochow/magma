@@ -190,8 +190,8 @@ pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> Engine {
     .unwrap();
     let render_pass = get_render_pass(device.clone(), &sc);
     let framebuffers = get_framebuffers(&images, &render_pass);
-    let vs = shader::vs::load(device.clone()).expect("failed to create shader module");
-    let fs = shader::fs::load(device.clone()).expect("failed to create shader module");
+    let vs = shader::screen_vs::load(device.clone()).expect("failed to create shader module");
+    let fs = shader::screen_fs::load(device.clone()).expect("failed to create shader module");
     let viewport = Viewport {
         offset: [0.0, 0.0],
         extent: window.inner_size().into(),

@@ -61,15 +61,6 @@ impl ApplicationHandler for App {
     }
 }
 
-fn main() {
-    let (instance, event_loop) = init_vulkan();
-    let mut app = App {
-        instance: instance,
-        engine: None,
-    };
-    event_loop.run_app(&mut app).expect("fuck");
-}
-
 fn init_vulkan() -> (Arc<Instance>, EventLoop<()>) {
     let event_loop = EventLoop::new().unwrap();
     // ControlFlow::Poll continuously runs the event loop, even if the OS hasn't
@@ -87,4 +78,15 @@ fn init_vulkan() -> (Arc<Instance>, EventLoop<()>) {
     )
     .expect("failed to create instance");
     (instance, event_loop)
+}
+
+fn main() {
+    let (instance, event_loop) = init_vulkan();
+    let mut app = App {
+        instance: instance,
+        engine: None,
+    };
+    event_loop
+        .run_app(&mut app)
+        .expect("failed to start application");
 }
