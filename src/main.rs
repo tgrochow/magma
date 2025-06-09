@@ -1,12 +1,7 @@
 use std::sync::Arc;
 use vulkano::VulkanLibrary;
 use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
-use vulkano::swapchain;
 use vulkano::swapchain::Surface;
-use vulkano::swapchain::SwapchainPresentInfo;
-use vulkano::sync;
-use vulkano::sync::GpuFuture;
-use vulkano::{Validated, VulkanError};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::ControlFlow;
@@ -20,7 +15,7 @@ mod shader;
 
 struct App {
     instance: Arc<Instance>,
-    render_state: Option<render::RenderState>,
+    engine: Option<render::Engine>,
 }
 
 impl ApplicationHandler for App {
@@ -30,7 +25,7 @@ impl ApplicationHandler for App {
                 .create_window(Window::default_attributes())
                 .unwrap(),
         );
-        self.render_state = Some(render::init(&self.instance, window));
+        self.engine = Some(render::init(&self.instance, window));
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
@@ -40,12 +35,11 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::Resized(_) => {
-                let render_state = self.render_state.as_mut().unwrap();
-                render_state.window_resized = true;
+                let engine = self.engine.as_mut().unwrap();
+                engine.window_resized = true;
             }
             WindowEvent::RedrawRequested => {
-                let render_state = self.render_state.as_mut().unwrap();
-                render_state.window_resized();
+                let engine = self.engine.as_mut().unwrap();
                 // Redraw the application.
                 //
                 // It's preferable for applications that do not render continuously to render in
@@ -53,72 +47,14 @@ impl ApplicationHandler for App {
                 // the program to gracefully handle redraws requested by the OS.
 
                 // Draw.
+                engine.draw();
 
                 // Queue a RedrawRequested event.
                 //
                 // You only need to call this if you've determined that you need to redraw in
                 // applications which do not always need to. Applications that redraw continuously
                 // can render here instead.
-                let (image_i, suboptimal, acquire_future) =
-                    match swapchain::acquire_next_image(render_state.swapchain.clone(), None)
-                        .map_err(Validated::unwrap)
-                    {
-                        Ok(r) => r,
-                        Err(VulkanError::OutOfDate) => {
-                            render_state.recreate_swapchain = true;
-                            return;
-                        }
-                        Err(e) => panic!("failed to acquire next image: {e}"),
-                    };
-                if suboptimal {
-                    render_state.recreate_swapchain = true;
-                }
-                // Wait for the fence related to this image to finish. Normally this would be the
-                // oldest fence that most likely has already finished.
-                if let Some(image_fence) = &render_state.fences[image_i as usize] {
-                    image_fence.wait(None).unwrap();
-                }
-                let previous_future =
-                    match render_state.fences[render_state.previous_fence_i as usize].clone() {
-                        // Create a `NowFuture`.
-                        None => {
-                            let mut now = sync::now(render_state.device.clone());
-                            now.cleanup_finished();
-
-                            now.boxed()
-                        }
-                        // Use the existing `FenceSignalFuture`.
-                        Some(fence) => fence.boxed(),
-                    };
-
-                let future = previous_future
-                    .join(acquire_future)
-                    .then_execute(
-                        render_state.queue.clone(),
-                        render_state.command_buffers[image_i as usize].clone(),
-                    )
-                    .unwrap()
-                    .then_swapchain_present(
-                        render_state.queue.clone(),
-                        SwapchainPresentInfo::swapchain_image_index(
-                            render_state.swapchain.clone(),
-                            image_i,
-                        ),
-                    )
-                    .then_signal_fence_and_flush();
-                render_state.fences[image_i as usize] = match future.map_err(Validated::unwrap) {
-                    Ok(value) => Some(Arc::new(value)),
-                    Err(VulkanError::OutOfDate) => {
-                        render_state.recreate_swapchain = true;
-                        None
-                    }
-                    Err(e) => {
-                        println!("failed to flush future: {e}");
-                        None
-                    }
-                };
-                render_state.previous_fence_i = image_i;
-                render_state.window.request_redraw();
+                engine.window.request_redraw();
             }
             _ => (),
         }
@@ -129,7 +65,7 @@ fn main() {
     let (instance, event_loop) = init_vulkan();
     let mut app = App {
         instance: instance,
-        render_state: None,
+        engine: None,
     };
     event_loop.run_app(&mut app).expect("fuck");
 }

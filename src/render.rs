@@ -1,9 +1,11 @@
 use crate::mesh::MeshVertex;
-use crate::{device, mesh, render, shader};
+use crate::{device, mesh, shader};
 use std::sync::Arc;
 use vulkano::image::ImageUsage;
 use vulkano::memory::allocator::StandardMemoryAllocator;
-use vulkano::swapchain::SwapchainCreateInfo;
+use vulkano::swapchain::{self, SwapchainCreateInfo, SwapchainPresentInfo};
+use vulkano::sync;
+use vulkano::{Validated, VulkanError};
 use vulkano::{
     buffer::Subbuffer,
     command_buffer::{
@@ -36,19 +38,19 @@ use vulkano::{
 };
 use winit::window::Window;
 
-pub struct RenderState {
+pub struct Engine {
     pub window: Arc<Window>,
-    pub device: Arc<Device>,
-    pub queue: Arc<Queue>,
-    pub viewport: Viewport,
-    pub vs: Arc<ShaderModule>,
-    pub fs: Arc<ShaderModule>,
-    pub render_pass: Arc<RenderPass>,
-    pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
-    pub vertex_buffer: Subbuffer<[MeshVertex]>,
-    pub command_buffers: Vec<Arc<PrimaryAutoCommandBuffer>>,
-    pub swapchain: Arc<Swapchain>,
-    pub fences: Vec<
+    device: Arc<Device>,
+    queue: Arc<Queue>,
+    viewport: Viewport,
+    vs: Arc<ShaderModule>,
+    fs: Arc<ShaderModule>,
+    render_pass: Arc<RenderPass>,
+    command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
+    vertex_buffer: Subbuffer<[MeshVertex]>,
+    command_buffers: Vec<Arc<PrimaryAutoCommandBuffer>>,
+    swapchain: Arc<Swapchain>,
+    fences: Vec<
         Option<
             Arc<
                 FenceSignalFuture<
@@ -61,13 +63,13 @@ pub struct RenderState {
             >,
         >,
     >,
-    pub previous_fence_i: u32,
+    previous_fence_index: u32,
     pub window_resized: bool,
-    pub recreate_swapchain: bool,
+    recreate_swapchain: bool,
 }
 
-impl RenderState {
-    pub fn window_resized(&mut self) {
+impl Engine {
+    pub fn handle_window_resize(&mut self) {
         if self.window_resized || self.recreate_swapchain {
             self.recreate_swapchain = false;
             let new_dimensions = self.window.inner_size();
@@ -82,16 +84,16 @@ impl RenderState {
             self.swapchain = new_swapchain;
             if self.window_resized {
                 self.window_resized = false;
-                let new_framebuffers = render::get_framebuffers(&new_images, &self.render_pass);
+                let new_framebuffers = get_framebuffers(&new_images, &self.render_pass);
                 self.viewport.extent = new_dimensions.into();
-                let new_pipeline = render::get_pipeline(
+                let new_pipeline = get_pipeline(
                     self.device.clone(),
                     self.vs.clone(),
                     self.fs.clone(),
                     self.render_pass.clone(),
                     self.viewport.clone(),
                 );
-                self.command_buffers = render::get_command_buffers(
+                self.command_buffers = get_command_buffers(
                     &self.command_buffer_allocator,
                     &self.queue,
                     &new_pipeline,
@@ -101,9 +103,66 @@ impl RenderState {
             }
         }
     }
+
+    pub fn draw(&mut self) {
+        self.handle_window_resize();
+        let (image_index, suboptimal, acquire_future) =
+            match swapchain::acquire_next_image(self.swapchain.clone(), None)
+                .map_err(Validated::unwrap)
+            {
+                Ok(r) => r,
+                Err(VulkanError::OutOfDate) => {
+                    self.recreate_swapchain = true;
+                    return;
+                }
+                Err(e) => panic!("failed to acquire next image: {e}"),
+            };
+        if suboptimal {
+            self.recreate_swapchain = true;
+        }
+        // Wait for the fence related to this image to finish. Normally this would be the
+        // oldest fence that most likely has already finished.
+        if let Some(image_fence) = &self.fences[image_index as usize] {
+            image_fence.wait(None).unwrap();
+        }
+        let previous_future = match self.fences[self.previous_fence_index as usize].clone() {
+            // Create a `NowFuture`.
+            None => {
+                let mut now = sync::now(self.device.clone());
+                now.cleanup_finished();
+                now.boxed()
+            }
+            // Use the existing `FenceSignalFuture`.
+            Some(fence) => fence.boxed(),
+        };
+        let future = previous_future
+            .join(acquire_future)
+            .then_execute(
+                self.queue.clone(),
+                self.command_buffers[image_index as usize].clone(),
+            )
+            .unwrap()
+            .then_swapchain_present(
+                self.queue.clone(),
+                SwapchainPresentInfo::swapchain_image_index(self.swapchain.clone(), image_index),
+            )
+            .then_signal_fence_and_flush();
+        self.fences[image_index as usize] = match future.map_err(Validated::unwrap) {
+            Ok(value) => Some(Arc::new(value)),
+            Err(VulkanError::OutOfDate) => {
+                self.recreate_swapchain = true;
+                None
+            }
+            Err(e) => {
+                println!("failed to flush future: {e}");
+                None
+            }
+        };
+        self.previous_fence_index = image_index;
+    }
 }
 
-pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> RenderState {
+pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> Engine {
     let surface = Surface::from_window(instance.clone(), window.clone())
         .expect("surface could not be created");
     let (physical_device, device, queue) = device::init_device(instance, &surface);
@@ -129,8 +188,8 @@ pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> RenderState {
         },
     )
     .unwrap();
-    let render_pass = render::get_render_pass(device.clone(), &sc);
-    let framebuffers = render::get_framebuffers(&images, &render_pass);
+    let render_pass = get_render_pass(device.clone(), &sc);
+    let framebuffers = get_framebuffers(&images, &render_pass);
     let vs = shader::vs::load(device.clone()).expect("failed to create shader module");
     let fs = shader::fs::load(device.clone()).expect("failed to create shader module");
     let viewport = Viewport {
@@ -138,7 +197,7 @@ pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> RenderState {
         extent: window.inner_size().into(),
         depth_range: 0.0..=1.0,
     };
-    let pipeline = render::get_pipeline(
+    let pipeline = get_pipeline(
         device.clone(),
         vs.clone(),
         fs.clone(),
@@ -151,7 +210,7 @@ pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> RenderState {
     ));
     let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
     let vertex_buffer = mesh::get_test_triangle(&memory_allocator);
-    let command_buffers = render::get_command_buffers(
+    let command_buffers = get_command_buffers(
         &command_buffer_allocator,
         &queue,
         &pipeline,
@@ -159,7 +218,7 @@ pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> RenderState {
         &vertex_buffer,
     );
     let frames_in_flight = images.len();
-    return RenderState {
+    return Engine {
         window: window,
         device: device,
         queue: queue,
@@ -172,13 +231,13 @@ pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> RenderState {
         vertex_buffer: vertex_buffer,
         command_buffers: command_buffers,
         fences: vec![None; frames_in_flight],
-        previous_fence_i: 0,
+        previous_fence_index: 0,
         window_resized: false,
         recreate_swapchain: false,
     };
 }
 
-pub fn get_render_pass(device: Arc<Device>, swapchain: &Arc<Swapchain>) -> Arc<RenderPass> {
+fn get_render_pass(device: Arc<Device>, swapchain: &Arc<Swapchain>) -> Arc<RenderPass> {
     vulkano::single_pass_renderpass!(
         device,
         attachments: {
@@ -198,10 +257,7 @@ pub fn get_render_pass(device: Arc<Device>, swapchain: &Arc<Swapchain>) -> Arc<R
     .unwrap()
 }
 
-pub fn get_framebuffers(
-    images: &[Arc<Image>],
-    render_pass: &Arc<RenderPass>,
-) -> Vec<Arc<Framebuffer>> {
+fn get_framebuffers(images: &[Arc<Image>], render_pass: &Arc<RenderPass>) -> Vec<Arc<Framebuffer>> {
     images
         .iter()
         .map(|image| {
@@ -218,7 +274,7 @@ pub fn get_framebuffers(
         .collect::<Vec<_>>()
 }
 
-pub fn get_pipeline(
+fn get_pipeline(
     device: Arc<Device>,
     vs: Arc<ShaderModule>,
     fs: Arc<ShaderModule>,
@@ -264,7 +320,7 @@ pub fn get_pipeline(
     .unwrap()
 }
 
-pub fn get_command_buffers(
+fn get_command_buffers(
     command_buffer_allocator: &Arc<StandardCommandBufferAllocator>,
     queue: &Arc<Queue>,
     pipeline: &Arc<GraphicsPipeline>,
