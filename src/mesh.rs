@@ -17,21 +17,112 @@ use vulkano::shader::EntryPoint;
 #[repr(C)]
 pub struct MeshVertex {
     #[format(R32G32_SFLOAT)]
-    position: [f32; 2],
+    position: [f32; 3],
+    #[format(R32G32_SFLOAT)]
+    normal: [f32; 3],
 }
 
-pub fn get_test_triangle(
+pub fn get_test_cube(
     memory_allocator: &Arc<GenericMemoryAllocator<FreeListAllocator>>,
 ) -> Subbuffer<[MeshVertex]> {
-    let vertex1 = MeshVertex {
-        position: [-0.5, -0.5],
-    };
-    let vertex2 = MeshVertex {
-        position: [0.0, 0.5],
-    };
-    let vertex3 = MeshVertex {
-        position: [0.5, -0.25],
-    };
+    let vertices = vec![
+        MeshVertex {
+            position: [-0.5, -0.5, 0.5],
+            normal: [0.0, 0.0, 1.0],
+        },
+        MeshVertex {
+            position: [0.5, -0.5, 0.5],
+            normal: [0.0, 0.0, 1.0],
+        },
+        MeshVertex {
+            position: [-0.5, 0.5, 0.5],
+            normal: [0.0, 0.0, 1.0],
+        },
+        MeshVertex {
+            position: [0.5, 0.5, 0.5],
+            normal: [0.0, 0.0, 1.0],
+        },
+        MeshVertex {
+            position: [-0.5, -0.5, -0.5],
+            normal: [0.0, 0.0, -1.0],
+        },
+        MeshVertex {
+            position: [0.5, -0.5, -0.5],
+            normal: [0.0, 0.0, -1.0],
+        },
+        MeshVertex {
+            position: [-0.5, 0.5, -0.5],
+            normal: [0.0, 0.0, -1.0],
+        },
+        MeshVertex {
+            position: [0.5, 0.5, -0.5],
+            normal: [0.0, 0.0, -1.0],
+        },
+        MeshVertex {
+            position: [-0.5, -0.5, 0.5],
+            normal: [-1.0, 0.0, 0.0],
+        },
+        MeshVertex {
+            position: [-0.5, -0.5, -0.5],
+            normal: [-1.0, 0.0, 0.0],
+        },
+        MeshVertex {
+            position: [-0.5, 0.5, 0.5],
+            normal: [-1.0, 0.0, 0.0],
+        },
+        MeshVertex {
+            position: [-0.5, 0.5, -0.5],
+            normal: [-1.0, 0.0, 0.0],
+        },
+        MeshVertex {
+            position: [0.5, -0.5, 0.5],
+            normal: [1.0, 0.0, 0.0],
+        },
+        MeshVertex {
+            position: [0.5, -0.5, -0.5],
+            normal: [1.0, 0.0, 0.0],
+        },
+        MeshVertex {
+            position: [0.5, 0.5, 0.5],
+            normal: [1.0, 0.0, 0.0],
+        },
+        MeshVertex {
+            position: [0.5, 0.5, -0.5],
+            normal: [1.0, 0.0, 0.0],
+        },
+        MeshVertex {
+            position: [-0.5, -0.5, -0.5],
+            normal: [0.0, -1.0, 0.0],
+        },
+        MeshVertex {
+            position: [0.5, -0.5, -0.5],
+            normal: [0.0, -1.0, 0.0],
+        },
+        MeshVertex {
+            position: [-0.5, -0.5, 0.5],
+            normal: [0.0, -1.0, 0.0],
+        },
+        MeshVertex {
+            position: [0.5, -0.5, 0.5],
+            normal: [0.0, -1.0, 0.0],
+        },
+        MeshVertex {
+            position: [-0.5, 0.5, -0.5],
+            normal: [0.0, 1.0, 0.0],
+        },
+        MeshVertex {
+            position: [0.5, 0.5, -0.5],
+            normal: [0.0, 1.0, 0.0],
+        },
+        MeshVertex {
+            position: [-0.5, 0.5, 0.5],
+            normal: [0.0, 1.0, 0.0],
+        },
+        MeshVertex {
+            position: [0.5, 0.5, 0.5],
+            normal: [0.0, 1.0, 0.0],
+        },
+    ];
     return Buffer::from_iter(
         memory_allocator.clone(),
         BufferCreateInfo {
@@ -43,7 +134,7 @@ pub fn get_test_triangle(
                 | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
             ..Default::default()
         },
-        vec![vertex1, vertex2, vertex3],
+        vertices,
     )
     .unwrap();
 }

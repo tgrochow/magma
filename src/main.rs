@@ -9,9 +9,9 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::{Window, WindowId};
 
 mod device;
-mod mesh;
 mod render;
 mod shader;
+mod shape;
 
 struct App {
     instance: Arc<Instance>,

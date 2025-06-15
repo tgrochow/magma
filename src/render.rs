@@ -1,5 +1,5 @@
-use crate::mesh::MeshVertex;
-use crate::{device, mesh, shader};
+use crate::shape::ShapeVertex;
+use crate::{device, shader, shape};
 use std::sync::Arc;
 use vulkano::image::ImageUsage;
 use vulkano::memory::allocator::StandardMemoryAllocator;
@@ -47,7 +47,7 @@ pub struct Engine {
     fs: Arc<ShaderModule>,
     render_pass: Arc<RenderPass>,
     command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
-    vertex_buffer: Subbuffer<[MeshVertex]>,
+    vertex_buffer: Subbuffer<[ShapeVertex]>,
     command_buffers: Vec<Arc<PrimaryAutoCommandBuffer>>,
     swapchain: Arc<Swapchain>,
     fences: Vec<
@@ -175,7 +175,7 @@ pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> Engine {
         .surface_formats(&surface, Default::default())
         .unwrap()[0]
         .0;
-    let (sc, images) = Swapchain::new(
+    let (swap_chain, images) = Swapchain::new(
         device.clone(),
         surface.clone(),
         SwapchainCreateInfo {
@@ -188,7 +188,7 @@ pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> Engine {
         },
     )
     .unwrap();
-    let render_pass = get_render_pass(device.clone(), &sc);
+    let render_pass = get_render_pass(device.clone(), &swap_chain);
     let framebuffers = get_framebuffers(&images, &render_pass);
     let vs = shader::screen_vs::load(device.clone()).expect("failed to create shader module");
     let fs = shader::screen_fs::load(device.clone()).expect("failed to create shader module");
@@ -209,7 +209,7 @@ pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> Engine {
         Default::default(),
     ));
     let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
-    let vertex_buffer = mesh::get_test_triangle(&memory_allocator);
+    let vertex_buffer = shape::get_test_triangle(&memory_allocator);
     let command_buffers = get_command_buffers(
         &command_buffer_allocator,
         &queue,
@@ -225,7 +225,7 @@ pub fn init(instance: &Arc<Instance>, window: Arc<Window>) -> Engine {
         viewport: viewport,
         vs: vs,
         fs: fs,
-        swapchain: sc,
+        swapchain: swap_chain,
         render_pass: render_pass,
         command_buffer_allocator: command_buffer_allocator,
         vertex_buffer: vertex_buffer,
@@ -283,7 +283,7 @@ fn get_pipeline(
 ) -> Arc<GraphicsPipeline> {
     let vs = vs.entry_point("main").unwrap();
     let fs = fs.entry_point("main").unwrap();
-    let vertex_input_state = mesh::get_vertex_input_state(&vs);
+    let vertex_input_state = shape::get_vertex_input_state(&vs);
     let stages = [
         PipelineShaderStageCreateInfo::new(vs),
         PipelineShaderStageCreateInfo::new(fs),
@@ -325,7 +325,7 @@ fn get_command_buffers(
     queue: &Arc<Queue>,
     pipeline: &Arc<GraphicsPipeline>,
     framebuffers: &Vec<Arc<Framebuffer>>,
-    vertex_buffer: &Subbuffer<[mesh::MeshVertex]>,
+    vertex_buffer: &Subbuffer<[shape::ShapeVertex]>,
 ) -> Vec<Arc<PrimaryAutoCommandBuffer>> {
     framebuffers
         .iter()
