@@ -1,4 +1,5 @@
 use glam::{Mat4, Vec3};
+use std::f32::consts::TAU;
 use std::sync::Arc;
 use vulkano::buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer};
 use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator};
@@ -127,9 +128,9 @@ impl Model {
     }
 
     pub fn rotate(&mut self, x: f32, y: f32, z: f32) {
-        self.rotation_x += x;
-        self.rotation_y += y;
-        self.rotation_z += z;
+        self.rotation_x = (self.rotation_x + x) % TAU;
+        self.rotation_y = (self.rotation_y + y) % TAU;
+        self.rotation_z = (self.rotation_z + z) % TAU;
     }
 
     pub fn translate(&mut self, vt: Vec3) {
