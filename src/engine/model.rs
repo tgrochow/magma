@@ -112,15 +112,15 @@ impl Model {
             let m_t = Mat4::from_translation(self.translation);
             model_matrix *= m_t
         }
-        if self.rotation_x > 0.0 {
+        if self.rotation_x != 0.0 {
             let m_rx = Mat4::from_rotation_x(self.rotation_x);
             model_matrix *= m_rx
         }
-        if self.rotation_y > 0.0 {
+        if self.rotation_y != 0.0 {
             let m_ry = Mat4::from_rotation_y(self.rotation_y);
             model_matrix *= m_ry
         }
-        if self.rotation_z > 0.0 {
+        if self.rotation_z != 0.0 {
             let m_rz = Mat4::from_rotation_z(self.rotation_z);
             model_matrix *= m_rz
         }

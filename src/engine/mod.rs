@@ -181,7 +181,7 @@ impl Engine {
             y: 0.0,
             z: -5.0,
         });
-        model.rotate(0.0, 0.3, 0.0);
+        model.rotate(0.0, -0.3, 0.0);
         let vertex_buffer = model.create_vertex_buffer(&memory_allocator);
         let normals_buffer = model.create_normals_buffer(&memory_allocator);
         let index_buffer = model.create_index_buffer(&memory_allocator);
@@ -247,7 +247,7 @@ impl Engine {
                 Vec3::new(0.0, 0.0, 0.0),
                 Vec3::new(0.0, 1.0, 0.0),
             );
-            self.model.rotate(0.1, 0.0, 0.0);
+            self.model.rotate(-0.1, 0.0, 0.0);
             let uniform_data = shader::mesh_vs::Data {
                 world: (self.model.get_model_matrix()).to_cols_array_2d(),
                 view: view.to_cols_array_2d(),
