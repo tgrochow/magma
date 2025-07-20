@@ -30,7 +30,7 @@ pub fn init_device(
             ..Default::default()
         },
     )
-    .expect("failed to create device");
+    .expect("engine: failed to create device");
     let queue = queues.next().unwrap();
     (physical_device, device, queue)
 }
@@ -42,7 +42,7 @@ pub fn select_physical_device(
 ) -> (Arc<PhysicalDevice>, u32) {
     instance
         .enumerate_physical_devices()
-        .expect("could not enumerate devices")
+        .expect("engine: could not enumerate devices")
         .filter(|p| p.supported_extensions().contains(&device_extensions))
         .filter_map(|p| {
             p.queue_family_properties()
@@ -67,5 +67,5 @@ pub fn select_physical_device(
             // match wildcard `_` to catch all unknown device types.
             _ => 4,
         })
-        .expect("no device available")
+        .expect("engine: no device available")
 }

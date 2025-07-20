@@ -1,4 +1,3 @@
-use glam::Mat4;
 use glam::Vec3;
 use std::sync::Arc;
 use vulkano::Validated;
@@ -58,6 +57,7 @@ use vulkano::sync::{self, GpuFuture};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
+mod camera;
 mod device;
 mod model;
 mod shader;
@@ -78,6 +78,7 @@ pub struct Engine {
     pipeline: Arc<GraphicsPipeline>,
     previous_frame_end: Option<Box<dyn GpuFuture>>,
     recreate_swapchain: bool,
+    camera: camera::Camera,
     model: model::Model,
     vertex_buffer: Subbuffer<[model::Position]>,
     normals_buffer: Subbuffer<[model::Normal]>,
@@ -136,6 +137,8 @@ impl Engine {
             )
             .unwrap()
         };
+        let aspect_ratio = swapchain.image_extent()[0] as f32 / swapchain.image_extent()[1] as f32;
+        let camera = camera::Camera::new(aspect_ratio);
         let render_pass = vulkano::single_pass_renderpass!(
             device.clone(),
             attachments: {
@@ -201,6 +204,7 @@ impl Engine {
             pipeline: pipeline,
             previous_frame_end: previous_frame_end,
             recreate_swapchain: false,
+            camera,
             model: model,
             vertex_buffer: vertex_buffer,
             normals_buffer: normals_buffer,
@@ -223,6 +227,9 @@ impl Engine {
                     ..self.swapchain.create_info()
                 })
                 .expect("engine: failed to recreate swapchain");
+            let aspect_ratio =
+                new_swapchain.image_extent()[0] as f32 / new_swapchain.image_extent()[1] as f32;
+            self.camera.update_projection(aspect_ratio);
             self.swapchain = new_swapchain;
             let new_framebuffers =
                 create_framebuffers(&self.memory_allocator, &new_images, &self.render_pass);
@@ -236,22 +243,12 @@ impl Engine {
             self.framebuffers = new_framebuffers;
             self.pipeline = new_pipeline;
         }
+        self.model.rotate(-0.1, 0.0, 0.0);
         let uniform_buffer = {
-            let aspect_ratio =
-                self.swapchain.image_extent()[0] as f32 / self.swapchain.image_extent()[1] as f32;
-
-            let proj =
-                Mat4::perspective_rh_gl(std::f32::consts::FRAC_PI_2, aspect_ratio, 0.01, 100.0);
-            let view = Mat4::look_at_rh(
-                Vec3::new(0.0, 0.0, 1.0),
-                Vec3::new(0.0, 0.0, 0.0),
-                Vec3::new(0.0, 1.0, 0.0),
-            );
-            self.model.rotate(-0.1, 0.0, 0.0);
             let uniform_data = shader::mesh_vs::Data {
-                world: (self.model.get_model_matrix()).to_cols_array_2d(),
-                view: view.to_cols_array_2d(),
-                proj: proj.to_cols_array_2d(),
+                world: self.model.get_model_matrix().to_cols_array_2d(),
+                view: self.camera.view.to_cols_array_2d(),
+                proj: self.camera.proj.to_cols_array_2d(),
             };
             let buffer = self.uniform_buffer_allocator.allocate_sized().unwrap();
             *buffer.write().unwrap() = uniform_data;
@@ -272,7 +269,7 @@ impl Engine {
                     self.recreate_swapchain = true;
                     return;
                 }
-                Err(e) => panic!("failed to acquire next image: {e}"),
+                Err(e) => panic!("engine: failed to acquire next image: {e}"),
             };
         if suboptimal {
             self.recreate_swapchain = true;
@@ -334,7 +331,7 @@ impl Engine {
                 self.previous_frame_end = Some(sync::now(self.device.clone()).boxed());
             }
             Err(e) => {
-                println!("failed to flush future: {e}");
+                println!("engine: failed to flush future: {e}");
                 self.previous_frame_end = Some(sync::now(self.device.clone()).boxed());
             }
         }
