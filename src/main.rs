@@ -37,11 +37,8 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window = Arc::new(
-            event_loop
-                .create_window(Window::default_attributes())
-                .unwrap(),
-        );
+        let window_attributes = Window::default_attributes().with_title("Magma v0.1.0");
+        let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
         self.engine = Some(engine::Engine::new(&self.instance, window));
     }
 

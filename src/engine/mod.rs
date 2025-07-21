@@ -3,11 +3,11 @@ use std::sync::Arc;
 use vulkano::Validated;
 use vulkano::VulkanError;
 use vulkano::buffer::BufferUsage;
-use vulkano::buffer::Subbuffer;
 use vulkano::buffer::allocator::SubbufferAllocator;
 use vulkano::buffer::allocator::SubbufferAllocatorCreateInfo;
 use vulkano::command_buffer::AutoCommandBufferBuilder;
 use vulkano::command_buffer::CommandBufferUsage;
+use vulkano::command_buffer::PrimaryAutoCommandBuffer;
 use vulkano::command_buffer::RenderPassBeginInfo;
 use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
 use vulkano::descriptor_set::DescriptorSet;
@@ -57,9 +57,12 @@ use vulkano::sync::{self, GpuFuture};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
+use crate::engine::scene::Scene;
+
 mod camera;
 mod device;
 mod model;
+mod scene;
 mod shader;
 
 pub struct Engine {
@@ -79,10 +82,7 @@ pub struct Engine {
     previous_frame_end: Option<Box<dyn GpuFuture>>,
     recreate_swapchain: bool,
     camera: camera::Camera,
-    model: model::Model,
-    vertex_buffer: Subbuffer<[model::Position]>,
-    normals_buffer: Subbuffer<[model::Normal]>,
-    index_buffer: Subbuffer<[u16]>,
+    scene: scene::Scene,
 }
 
 impl Engine {
@@ -118,7 +118,6 @@ impl Engine {
                 .physical_device()
                 .surface_formats(&surface, Default::default())
                 .unwrap()[0];
-
             Swapchain::new(
                 device.clone(),
                 surface,
@@ -178,16 +177,29 @@ impl Engine {
             window_size,
         );
         let previous_frame_end = Some(sync::now(device.clone()).boxed());
-        let mut model = model::get_cube();
-        model.translate(Vec3 {
+        let mut scene = Scene::new();
+        let mut cube1 = model::get_cube();
+        cube1.translate(Vec3 {
             x: 0.0,
             y: 0.0,
             z: -5.0,
         });
-        model.rotate(0.0, -0.3, 0.0);
-        let vertex_buffer = model.create_vertex_buffer(&memory_allocator);
-        let normals_buffer = model.create_normals_buffer(&memory_allocator);
-        let index_buffer = model.create_index_buffer(&memory_allocator);
+        cube1.rotate(0.0, -0.3, 0.0);
+        scene.models.insert("cube1".to_string(), cube1);
+        let mut cube2 = model::get_cube();
+        cube2.translate(Vec3 {
+            x: 3.0,
+            y: 0.0,
+            z: -5.0,
+        });
+        scene.models.insert("cube2".to_string(), cube2);
+        let mut cube3 = model::get_cube();
+        cube3.translate(Vec3 {
+            x: -3.0,
+            y: 0.0,
+            z: -5.0,
+        });
+        scene.models.insert("cube3".to_string(), cube3);
         Engine {
             device: device,
             queue: queue,
@@ -204,11 +216,8 @@ impl Engine {
             pipeline: pipeline,
             previous_frame_end: previous_frame_end,
             recreate_swapchain: false,
-            camera,
-            model: model,
-            vertex_buffer: vertex_buffer,
-            normals_buffer: normals_buffer,
-            index_buffer: index_buffer,
+            camera: camera,
+            scene: scene,
         }
     }
 
@@ -219,49 +228,8 @@ impl Engine {
         }
         self.previous_frame_end.as_mut().unwrap().cleanup_finished();
         if self.recreate_swapchain {
-            self.recreate_swapchain = false;
-            let (new_swapchain, new_images) = self
-                .swapchain
-                .recreate(SwapchainCreateInfo {
-                    image_extent: window_size.into(),
-                    ..self.swapchain.create_info()
-                })
-                .expect("engine: failed to recreate swapchain");
-            let aspect_ratio =
-                new_swapchain.image_extent()[0] as f32 / new_swapchain.image_extent()[1] as f32;
-            self.camera.update_projection(aspect_ratio);
-            self.swapchain = new_swapchain;
-            let new_framebuffers =
-                create_framebuffers(&self.memory_allocator, &new_images, &self.render_pass);
-            let new_pipeline = create_pipeline(
-                &self.device,
-                &self.render_pass,
-                self.vertex_shader.clone(),
-                self.fragment_shader.clone(),
-                window_size,
-            );
-            self.framebuffers = new_framebuffers;
-            self.pipeline = new_pipeline;
+            self.update_window_size(window_size);
         }
-        self.model.rotate(-0.1, 0.0, 0.0);
-        let uniform_buffer = {
-            let uniform_data = shader::mesh_vs::Data {
-                world: self.model.get_model_matrix().to_cols_array_2d(),
-                view: self.camera.view.to_cols_array_2d(),
-                proj: self.camera.proj.to_cols_array_2d(),
-            };
-            let buffer = self.uniform_buffer_allocator.allocate_sized().unwrap();
-            *buffer.write().unwrap() = uniform_data;
-            buffer
-        };
-        let layout = &self.pipeline.layout().set_layouts()[0];
-        let descriptor_set = DescriptorSet::new(
-            self.descriptor_set_allocator.clone(),
-            layout.clone(),
-            [WriteDescriptorSet::buffer(0, uniform_buffer)],
-            [],
-        )
-        .unwrap();
         let (image_index, suboptimal, acquire_future) =
             match acquire_next_image(self.swapchain.clone(), None).map_err(Validated::unwrap) {
                 Ok(r) => r,
@@ -292,22 +260,21 @@ impl Engine {
             )
             .unwrap()
             .bind_pipeline_graphics(self.pipeline.clone())
-            .unwrap()
-            .bind_descriptor_sets(
-                PipelineBindPoint::Graphics,
-                self.pipeline.layout().clone(),
-                0,
-                descriptor_set,
-            )
-            .unwrap()
-            .bind_vertex_buffers(0, (self.vertex_buffer.clone(), self.normals_buffer.clone()))
-            .unwrap()
-            .bind_index_buffer(self.index_buffer.clone())
             .unwrap();
-        unsafe { builder.draw_indexed(self.index_buffer.len() as u32, 1, 0, 0, 0) }.unwrap();
-
+        self.scene
+            .models
+            .get_mut("cube1")
+            .unwrap()
+            .rotate(-0.1, 0.0, 0.0);
+        self.scene
+            .models
+            .get_mut("cube2")
+            .unwrap()
+            .rotate(0.0, 0.0, 0.1);
+        for (_key, model) in &self.scene.models {
+            self.draw_model(&mut builder, &model);
+        }
         builder.end_render_pass(Default::default()).unwrap();
-
         let command_buffer = builder.build().unwrap();
         let future = self
             .previous_frame_end
@@ -321,7 +288,6 @@ impl Engine {
                 SwapchainPresentInfo::swapchain_image_index(self.swapchain.clone(), image_index),
             )
             .then_signal_fence_and_flush();
-
         match future.map_err(Validated::unwrap) {
             Ok(future) => {
                 self.previous_frame_end = Some(future.boxed());
@@ -336,6 +302,74 @@ impl Engine {
             }
         }
         self.window.request_redraw();
+    }
+
+    fn draw_model(
+        &self,
+        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        model: &model::Model,
+    ) {
+        let pos_buffer = model.create_vertex_buffer(&self.memory_allocator);
+        let normals_buffer = model.create_normals_buffer(&self.memory_allocator);
+        let index_buffer = model.create_index_buffer(&self.memory_allocator);
+        let index_buffer_length = index_buffer.len() as u32;
+        let uniform_buffer = {
+            let uniform_data = shader::mesh_vs::Data {
+                world: model.get_model_matrix().to_cols_array_2d(),
+                view: self.camera.view.to_cols_array_2d(),
+                proj: self.camera.proj.to_cols_array_2d(),
+            };
+            let buffer = self.uniform_buffer_allocator.allocate_sized().unwrap();
+            *buffer.write().unwrap() = uniform_data;
+            buffer
+        };
+        let layout = &self.pipeline.layout().set_layouts()[0];
+        let descriptor_set = DescriptorSet::new(
+            self.descriptor_set_allocator.clone(),
+            layout.clone(),
+            [WriteDescriptorSet::buffer(0, uniform_buffer)],
+            [],
+        )
+        .unwrap();
+        builder
+            .bind_descriptor_sets(
+                PipelineBindPoint::Graphics,
+                self.pipeline.layout().clone(),
+                0,
+                descriptor_set,
+            )
+            .unwrap()
+            .bind_vertex_buffers(0, (pos_buffer, normals_buffer))
+            .unwrap()
+            .bind_index_buffer(index_buffer)
+            .unwrap();
+        unsafe { builder.draw_indexed(index_buffer_length, 1, 0, 0, 0) }.unwrap();
+    }
+
+    fn update_window_size(&mut self, window_size: PhysicalSize<u32>) {
+        self.recreate_swapchain = false;
+        let (new_swapchain, new_images) = self
+            .swapchain
+            .recreate(SwapchainCreateInfo {
+                image_extent: window_size.into(),
+                ..self.swapchain.create_info()
+            })
+            .expect("engine: failed to recreate swapchain");
+        let aspect_ratio =
+            new_swapchain.image_extent()[0] as f32 / new_swapchain.image_extent()[1] as f32;
+        self.camera.update_projection(aspect_ratio);
+        self.swapchain = new_swapchain;
+        let new_framebuffers =
+            create_framebuffers(&self.memory_allocator, &new_images, &self.render_pass);
+        let new_pipeline = create_pipeline(
+            &self.device,
+            &self.render_pass,
+            self.vertex_shader.clone(),
+            self.fragment_shader.clone(),
+            window_size,
+        );
+        self.framebuffers = new_framebuffers;
+        self.pipeline = new_pipeline;
     }
 
     pub fn recreate_swapchain(&mut self) {
@@ -367,7 +401,6 @@ fn create_framebuffers(
         .iter()
         .map(|image| {
             let view = ImageView::new_default(image.clone()).unwrap();
-
             Framebuffer::new(
                 render_pass.clone(),
                 FramebufferCreateInfo {
