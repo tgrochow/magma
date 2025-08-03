@@ -1,4 +1,5 @@
 use glam::Vec3;
+use std::path::Path;
 use std::sync::Arc;
 use vulkano::Validated;
 use vulkano::VulkanError;
@@ -178,14 +179,15 @@ impl Engine {
         );
         let previous_frame_end = Some(sync::now(device.clone()).boxed());
         let mut scene = Scene::new();
-        let mut cube1 = model::get_cube();
-        cube1.translate(Vec3 {
-            x: 0.0,
-            y: 0.0,
-            z: -5.0,
-        });
-        cube1.rotate(0.0, -0.3, 0.0);
-        scene.models.insert("cube1".to_string(), cube1);
+        scene.load_model(Path::new("./models/suzanne.gltf"));
+        // let mut cube1 = model::get_cube();
+        // cube1.translate(Vec3 {
+        //     x: 0.0,
+        //     y: 0.0,
+        //     z: -5.0,
+        // });
+        // cube1.rotate(0.0, -0.3, 0.0);
+        // scene.models.insert("cube1".to_string(), cube1);
         let mut cube2 = model::get_cube();
         cube2.translate(Vec3 {
             x: 3.0,
@@ -251,7 +253,7 @@ impl Engine {
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    clear_values: vec![Some([0.0, 0.0, 1.0, 1.0].into()), Some(1f32.into())],
+                    clear_values: vec![Some([0.1, 0.1, 0.1, 1.0].into()), Some(1f32.into())],
                     ..RenderPassBeginInfo::framebuffer(
                         self.framebuffers[image_index as usize].clone(),
                     )
@@ -261,11 +263,11 @@ impl Engine {
             .unwrap()
             .bind_pipeline_graphics(self.pipeline.clone())
             .unwrap();
-        self.scene
-            .models
-            .get_mut("cube1")
-            .unwrap()
-            .rotate(-0.1, 0.0, 0.0);
+        // self.scene
+        //     .models
+        //     .get_mut("cube1")
+        //     .unwrap()
+        //     .rotate(-0.1, 0.0, 0.0);
         self.scene
             .models
             .get_mut("cube2")

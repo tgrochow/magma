@@ -13,7 +13,7 @@ impl Camera {
             view: Mat4::look_at_rh(
                 Vec3::new(0.0, 0.0, 1.0),
                 Vec3::new(0.0, 0.0, 0.0),
-                Vec3::new(0.0, 1.0, 0.0),
+                Vec3::new(0.0, -1.0, 0.0),
             ),
         }
     }

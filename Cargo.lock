@@ -726,6 +726,8 @@ name = "magma"
 version = "0.1.0"
 dependencies = [
  "glam",
+ "serde",
+ "serde_json",
  "vulkano 0.35.1",
  "vulkano-shaders",
  "vulkano-win",

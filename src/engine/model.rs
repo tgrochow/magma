@@ -12,11 +12,25 @@ pub struct Position {
     position: [f32; 3],
 }
 
+impl Position {
+    pub fn new(x: f32, y: f32, z: f32) -> Self {
+        Position {
+            position: [x, y, z],
+        }
+    }
+}
+
 #[derive(BufferContents, Vertex, Clone)]
 #[repr(C)]
 pub struct Normal {
     #[format(R32G32B32_SFLOAT)]
     normal: [f32; 3],
+}
+
+impl Normal {
+    pub fn new(x: f32, y: f32, z: f32) -> Self {
+        Normal { normal: [x, y, z] }
+    }
 }
 
 pub struct Model {
@@ -30,11 +44,11 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(positions: Vec<Position>, normals: Vec<Normal>, indeces: Vec<u16>) -> Self {
+    pub fn new(positions: Vec<Position>, normals: Vec<Normal>, indices: Vec<u16>) -> Self {
         Model {
             positions: positions,
             normals: normals,
-            indices: indeces,
+            indices: indices,
             translation: Vec3 {
                 x: 0.0,
                 y: 0.0,
