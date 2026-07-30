@@ -4,8 +4,9 @@ use vulkano::VulkanLibrary;
 use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
 use vulkano::swapchain::Surface;
 use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
+use winit::event::{ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowId};
 
 mod engine;
@@ -57,6 +58,22 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 self.engine.as_mut().unwrap().draw();
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                if event.state == ElementState::Pressed {
+                    match &event.logical_key {
+                        Key::Named(NamedKey::Escape) => {
+                            event_loop.exit();
+                        }
+                        Key::Named(NamedKey::ArrowUp) => {
+                            self.engine.as_mut().unwrap().camera.move_forward()
+                        }
+                        Key::Named(NamedKey::ArrowDown) => {
+                            self.engine.as_mut().unwrap().camera.move_backwards()
+                        }
+                        _ => {}
+                    }
+                }
             }
             _ => {}
         }
