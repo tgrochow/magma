@@ -145,7 +145,7 @@ impl Engine {
             .unwrap()
             .entry_point("main")
             .unwrap();
-        let fragment_shader = shader::mesh_fs::load(device.clone())
+        let fragment_shader = shader::debug_fs::load(device.clone())
             .unwrap()
             .entry_point("main")
             .unwrap();

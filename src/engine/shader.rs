@@ -11,3 +11,10 @@ pub mod mesh_fs {
         path: "src/shader/frag.glsl",
     }
 }
+
+pub mod debug_fs {
+    vulkano_shaders::shader! {
+        ty: "fragment",
+        path: "src/shader/debug.glsl",
+    }
+}
