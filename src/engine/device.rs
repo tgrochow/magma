@@ -1,11 +1,8 @@
 use std::sync::Arc;
 
-use vulkano::device::DeviceExtensions;
-use vulkano::device::Queue;
-use vulkano::device::QueueFlags;
-use vulkano::device::physical::PhysicalDevice;
-use vulkano::device::physical::PhysicalDeviceType;
+use vulkano::device::physical::{PhysicalDevice, PhysicalDeviceType};
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
+use vulkano::device::{DeviceExtensions, Queue, QueueFlags};
 use vulkano::instance::Instance;
 use vulkano::swapchain::Surface;
 

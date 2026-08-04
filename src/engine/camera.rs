@@ -1,9 +1,8 @@
-use glam::Mat4;
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 
 pub struct Camera {
-    pub proj: Mat4,
-    pub view: Mat4,
+    proj: Mat4,
+    view: Mat4,
     pos: Vec3,
     dir: Vec3,
     up: Vec3,
@@ -21,6 +20,14 @@ impl Camera {
             proj: get_projection_matrix(aspect_ratio),
             view: get_view_matrix(pos, dir, up),
         }
+    }
+
+    pub fn get_projection_matrix(&self) -> Mat4 {
+        self.proj.clone()
+    }
+
+    pub fn get_view_matrix(&self) -> Mat4 {
+        self.view.clone()
     }
 
     // must be called if aspect ratio of window was changed

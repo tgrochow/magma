@@ -1,60 +1,39 @@
 use glam::Vec3;
 use std::path::Path;
 use std::sync::Arc;
-use vulkano::Validated;
-use vulkano::VulkanError;
 use vulkano::buffer::BufferUsage;
-use vulkano::buffer::allocator::SubbufferAllocator;
-use vulkano::buffer::allocator::SubbufferAllocatorCreateInfo;
-use vulkano::command_buffer::AutoCommandBufferBuilder;
-use vulkano::command_buffer::CommandBufferUsage;
-use vulkano::command_buffer::PrimaryAutoCommandBuffer;
-use vulkano::command_buffer::RenderPassBeginInfo;
+use vulkano::buffer::allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo};
 use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
-use vulkano::descriptor_set::DescriptorSet;
-use vulkano::descriptor_set::WriteDescriptorSet;
+use vulkano::command_buffer::{
+    AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer, RenderPassBeginInfo,
+};
 use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
-use vulkano::device::Device;
-use vulkano::device::Queue;
+use vulkano::descriptor_set::{DescriptorSet, WriteDescriptorSet};
+use vulkano::device::{Device, Queue};
 use vulkano::format::Format;
-use vulkano::image::Image;
-use vulkano::image::ImageCreateInfo;
-use vulkano::image::ImageType;
-use vulkano::image::ImageUsage;
 use vulkano::image::view::ImageView;
+use vulkano::image::{Image, ImageCreateInfo, ImageType, ImageUsage};
 use vulkano::instance::Instance;
-use vulkano::memory::allocator::AllocationCreateInfo;
-use vulkano::memory::allocator::MemoryTypeFilter;
-use vulkano::memory::allocator::StandardMemoryAllocator;
-use vulkano::pipeline::GraphicsPipeline;
-use vulkano::pipeline::Pipeline;
-use vulkano::pipeline::PipelineBindPoint;
-use vulkano::pipeline::PipelineLayout;
-use vulkano::pipeline::PipelineShaderStageCreateInfo;
+use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator};
 use vulkano::pipeline::graphics::GraphicsPipelineCreateInfo;
-use vulkano::pipeline::graphics::color_blend::ColorBlendAttachmentState;
-use vulkano::pipeline::graphics::color_blend::ColorBlendState;
-use vulkano::pipeline::graphics::depth_stencil::DepthState;
-use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
+use vulkano::pipeline::graphics::color_blend::{ColorBlendAttachmentState, ColorBlendState};
+use vulkano::pipeline::graphics::depth_stencil::{DepthState, DepthStencilState};
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::multisample::MultisampleState;
 use vulkano::pipeline::graphics::rasterization::RasterizationState;
-use vulkano::pipeline::graphics::vertex_input::Vertex;
-use vulkano::pipeline::graphics::vertex_input::VertexDefinition;
-use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::pipeline::graphics::viewport::ViewportState;
+use vulkano::pipeline::graphics::vertex_input::{Vertex, VertexDefinition};
+use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
 use vulkano::pipeline::layout::PipelineDescriptorSetLayoutCreateInfo;
-use vulkano::render_pass::Framebuffer;
-use vulkano::render_pass::FramebufferCreateInfo;
-use vulkano::render_pass::RenderPass;
-use vulkano::render_pass::Subpass;
+use vulkano::pipeline::{
+    GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout, PipelineShaderStageCreateInfo,
+};
+use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass};
 use vulkano::shader::EntryPoint;
-use vulkano::swapchain::Surface;
-use vulkano::swapchain::Swapchain;
-use vulkano::swapchain::SwapchainCreateInfo;
-use vulkano::swapchain::SwapchainPresentInfo;
-use vulkano::swapchain::acquire_next_image;
+use vulkano::swapchain::{
+    Surface, Swapchain, SwapchainCreateInfo, SwapchainPresentInfo, acquire_next_image,
+};
 use vulkano::sync::{self, GpuFuture};
+use vulkano::{Validated, VulkanError};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
@@ -255,11 +234,6 @@ impl Engine {
             .unwrap()
             .bind_pipeline_graphics(self.pipeline.clone())
             .unwrap();
-        // self.scene
-        //     .models
-        //     .get_mut("cube1")
-        //     .unwrap()
-        //     .rotate(-0.1, 0.0, 0.0);
         self.scene
             .models
             .get_mut("cube2")
@@ -310,8 +284,8 @@ impl Engine {
         let uniform_buffer = {
             let uniform_data = shader::mesh_vs::Data {
                 world: model.get_model_matrix().to_cols_array_2d(),
-                view: self.camera.view.to_cols_array_2d(),
-                proj: self.camera.proj.to_cols_array_2d(),
+                view: self.camera.get_view_matrix().to_cols_array_2d(),
+                proj: self.camera.get_projection_matrix().to_cols_array_2d(),
             };
             let buffer = self.uniform_buffer_allocator.allocate_sized().unwrap();
             *buffer.write().unwrap() = uniform_data;
