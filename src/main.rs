@@ -9,11 +9,15 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowId};
 
+use crate::engine::scene;
+use crate::engine::scene::Scene;
+
 mod engine;
 
 struct App {
     instance: Arc<Instance>,
     engine: Option<engine::Engine>,
+    scene: Scene,
 }
 
 impl App {
@@ -32,6 +36,7 @@ impl App {
         App {
             instance: instance,
             engine: None,
+            scene: scene::get_default_scene(),
         }
     }
 }
@@ -57,7 +62,12 @@ impl ApplicationHandler for App {
                 self.engine.as_mut().unwrap().recreate_swapchain();
             }
             WindowEvent::RedrawRequested => {
-                self.engine.as_mut().unwrap().draw();
+                self.scene
+                    .models
+                    .get_mut("cube2")
+                    .unwrap()
+                    .rotate(0.0, 0.0, 0.1);
+                self.engine.as_mut().unwrap().draw(&self.scene);
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 if event.state == ElementState::Pressed {

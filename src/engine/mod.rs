@@ -1,5 +1,3 @@
-use glam::Vec3;
-use std::path::Path;
 use std::sync::Arc;
 use vulkano::buffer::BufferUsage;
 use vulkano::buffer::allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo};
@@ -42,7 +40,7 @@ use crate::engine::scene::Scene;
 mod camera;
 mod device;
 mod model;
-mod scene;
+pub mod scene;
 mod shader;
 
 pub struct Engine {
@@ -62,7 +60,6 @@ pub struct Engine {
     previous_frame_end: Option<Box<dyn GpuFuture>>,
     recreate_swapchain: bool,
     pub camera: camera::Camera,
-    scene: scene::Scene,
 }
 
 impl Engine {
@@ -157,22 +154,6 @@ impl Engine {
             window_size,
         );
         let previous_frame_end = Some(sync::now(device.clone()).boxed());
-        let mut scene = Scene::new();
-        scene.load_model(Path::new("./models/suzanne.gltf"));
-        let mut cube2 = model::get_cube();
-        cube2.translate(Vec3 {
-            x: 3.0,
-            y: 0.0,
-            z: -5.0,
-        });
-        scene.models.insert("cube2".to_string(), cube2);
-        let mut cube3 = model::get_cube();
-        cube3.translate(Vec3 {
-            x: -3.0,
-            y: 0.0,
-            z: -5.0,
-        });
-        scene.models.insert("cube3".to_string(), cube3);
         Engine {
             device: device,
             queue: queue,
@@ -190,11 +171,10 @@ impl Engine {
             previous_frame_end: previous_frame_end,
             recreate_swapchain: false,
             camera: camera,
-            scene: scene,
         }
     }
 
-    pub fn draw(&mut self) {
+    pub fn draw(&mut self, scene: &Scene) {
         let window_size = self.window.inner_size();
         if window_size.width == 0 || window_size.height == 0 {
             return;
@@ -224,7 +204,7 @@ impl Engine {
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    clear_values: vec![Some([0.1, 0.1, 0.1, 1.0].into()), Some(1f32.into())],
+                    clear_values: vec![Some([0.0, 0.0, 0.0, 1.0].into()), Some(1f32.into())],
                     ..RenderPassBeginInfo::framebuffer(
                         self.framebuffers[image_index as usize].clone(),
                     )
@@ -234,12 +214,7 @@ impl Engine {
             .unwrap()
             .bind_pipeline_graphics(self.pipeline.clone())
             .unwrap();
-        self.scene
-            .models
-            .get_mut("cube2")
-            .unwrap()
-            .rotate(0.0, 0.0, 0.1);
-        for (_key, model) in &self.scene.models {
+        for (_key, model) in &scene.models {
             self.draw_model(&mut builder, &model);
         }
         builder.end_render_pass(Default::default()).unwrap();

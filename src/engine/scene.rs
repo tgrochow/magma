@@ -1,11 +1,12 @@
-use crate::engine::model::{Model, Normal, Position};
-
 use glam::Vec3;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
+
+use crate::engine::model;
+use crate::engine::model::{Model, Normal, Position};
 
 #[derive(Deserialize)]
 struct GLTF {
@@ -79,7 +80,7 @@ impl Scene {
         }
     }
 
-    pub fn load_model(&mut self, path: &Path) {
+    pub fn load_model(&mut self, path: &Path, name: String) {
         let file = File::open(path).expect("engine: file doesn't exist");
         let reader = BufReader::new(file);
         let data: GLTF = serde_json::from_reader(reader).expect("engine: couldn't parse file");
@@ -95,7 +96,7 @@ impl Scene {
                 y: 0.0,
                 z: -3.0,
             });
-            self.models.insert("adssad".to_string(), model);
+            self.models.insert(name.clone(), model);
         }
     }
 }
@@ -162,4 +163,24 @@ fn load_indices(model_dir: &Path, mesh: &GLTFMesh, data: &GLTF) -> Vec<u16> {
         indices.push(u16::from_le_bytes(bytes));
     }
     indices
+}
+
+pub fn get_default_scene() -> Scene {
+    let mut scene = Scene::new();
+    scene.load_model(Path::new("./models/suzanne.gltf"), "suzanne".to_string());
+    let mut cube2 = model::get_cube();
+    cube2.translate(Vec3 {
+        x: 3.0,
+        y: 0.0,
+        z: -5.0,
+    });
+    scene.models.insert("cube2".to_string(), cube2);
+    let mut cube3 = model::get_cube();
+    cube3.translate(Vec3 {
+        x: -3.0,
+        y: 0.0,
+        z: -5.0,
+    });
+    scene.models.insert("cube3".to_string(), cube3);
+    scene
 }
