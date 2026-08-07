@@ -10,12 +10,14 @@ use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowId};
 
 mod engine;
+mod scene;
+mod shader;
 
 struct App {
     instance: Arc<Instance>,
     window: Option<Arc<Window>>,
     engine: Option<engine::Engine>,
-    scene: Option<engine::scene::Scene>,
+    scene: Option<scene::Scene>,
 }
 
 impl App {
@@ -51,7 +53,7 @@ impl ApplicationHandler for App {
             &self.instance,
             self.window.as_ref().unwrap().clone(),
         ));
-        self.scene = Some(engine::scene::get_default_scene(aspect_ratio));
+        self.scene = Some(scene::get_default_scene(aspect_ratio));
     }
 
     fn window_event(

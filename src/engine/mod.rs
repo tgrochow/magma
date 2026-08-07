@@ -35,14 +35,10 @@ use vulkano::{Validated, VulkanError};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
-use crate::engine;
-use crate::engine::scene::Scene;
+use crate::scene;
+use crate::shader;
 
-pub mod camera;
 mod device;
-mod model;
-pub mod scene;
-mod shader;
 
 pub struct Engine {
     device: Arc<Device>,
@@ -171,7 +167,7 @@ impl Engine {
         }
     }
 
-    pub fn draw(&mut self, scene: &Scene, window_size: PhysicalSize<u32>) {
+    pub fn draw(&mut self, scene: &scene::Scene, window_size: PhysicalSize<u32>) {
         if window_size.width == 0 || window_size.height == 0 {
             return;
         }
@@ -245,8 +241,8 @@ impl Engine {
     fn draw_model(
         &self,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        model: &model::Model,
-        camera: &engine::camera::Camera,
+        model: &scene::model::Model,
+        camera: &scene::camera::Camera,
     ) {
         let pos_buffer = model.create_vertex_buffer(&self.memory_allocator);
         let normals_buffer = model.create_normals_buffer(&self.memory_allocator);
@@ -357,9 +353,12 @@ fn create_pipeline(
     fs: EntryPoint,
     window_size: PhysicalSize<u32>,
 ) -> Arc<GraphicsPipeline> {
-    let vertex_input_state = [model::Position::per_vertex(), model::Normal::per_vertex()]
-        .definition(&vs)
-        .unwrap();
+    let vertex_input_state = [
+        scene::model::Position::per_vertex(),
+        scene::model::Normal::per_vertex(),
+    ]
+    .definition(&vs)
+    .unwrap();
     let stages = [
         PipelineShaderStageCreateInfo::new(vs),
         PipelineShaderStageCreateInfo::new(fs),
