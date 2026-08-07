@@ -35,9 +35,10 @@ use vulkano::{Validated, VulkanError};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
+use crate::engine;
 use crate::engine::scene::Scene;
 
-mod camera;
+pub mod camera;
 mod device;
 mod model;
 pub mod scene;
@@ -50,7 +51,7 @@ pub struct Engine {
     descriptor_set_allocator: Arc<StandardDescriptorSetAllocator>,
     command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
     uniform_buffer_allocator: SubbufferAllocator,
-    window: Arc<Window>,
+    window_size: PhysicalSize<u32>,
     swapchain: Arc<Swapchain>,
     render_pass: Arc<RenderPass>,
     vertex_shader: EntryPoint,
@@ -59,7 +60,6 @@ pub struct Engine {
     pipeline: Arc<GraphicsPipeline>,
     previous_frame_end: Option<Box<dyn GpuFuture>>,
     recreate_swapchain: bool,
-    pub camera: camera::Camera,
 }
 
 impl Engine {
@@ -113,8 +113,6 @@ impl Engine {
             )
             .unwrap()
         };
-        let aspect_ratio = swapchain.image_extent()[0] as f32 / swapchain.image_extent()[1] as f32;
-        let camera = camera::Camera::new(aspect_ratio);
         let render_pass = vulkano::single_pass_renderpass!(
             device.clone(),
             attachments: {
@@ -161,7 +159,7 @@ impl Engine {
             descriptor_set_allocator: descriptor_set_allocator,
             command_buffer_allocator: command_buffer_allocator,
             uniform_buffer_allocator: uniform_buffer_allocator,
-            window: window,
+            window_size: window_size,
             swapchain: swapchain,
             render_pass: render_pass,
             vertex_shader: vertex_shader,
@@ -170,12 +168,10 @@ impl Engine {
             pipeline: pipeline,
             previous_frame_end: previous_frame_end,
             recreate_swapchain: false,
-            camera: camera,
         }
     }
 
-    pub fn draw(&mut self, scene: &Scene) {
-        let window_size = self.window.inner_size();
+    pub fn draw(&mut self, scene: &Scene, window_size: PhysicalSize<u32>) {
         if window_size.width == 0 || window_size.height == 0 {
             return;
         }
@@ -215,7 +211,7 @@ impl Engine {
             .bind_pipeline_graphics(self.pipeline.clone())
             .unwrap();
         for (_key, model) in &scene.models {
-            self.draw_model(&mut builder, &model);
+            self.draw_model(&mut builder, &model, &scene.camera);
         }
         builder.end_render_pass(Default::default()).unwrap();
         let command_buffer = builder.build().unwrap();
@@ -244,13 +240,13 @@ impl Engine {
                 self.previous_frame_end = Some(sync::now(self.device.clone()).boxed());
             }
         }
-        self.window.request_redraw();
     }
 
     fn draw_model(
         &self,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         model: &model::Model,
+        camera: &engine::camera::Camera,
     ) {
         let pos_buffer = model.create_vertex_buffer(&self.memory_allocator);
         let normals_buffer = model.create_normals_buffer(&self.memory_allocator);
@@ -259,8 +255,8 @@ impl Engine {
         let uniform_buffer = {
             let uniform_data = shader::mesh_vs::Data {
                 world: model.get_model_matrix().to_cols_array_2d(),
-                view: self.camera.get_view_matrix().to_cols_array_2d(),
-                proj: self.camera.get_projection_matrix().to_cols_array_2d(),
+                view: camera.get_view_matrix().to_cols_array_2d(),
+                proj: camera.get_projection_matrix().to_cols_array_2d(),
             };
             let buffer = self.uniform_buffer_allocator.allocate_sized().unwrap();
             *buffer.write().unwrap() = uniform_data;
@@ -290,6 +286,7 @@ impl Engine {
     }
 
     fn update_window_size(&mut self, window_size: PhysicalSize<u32>) {
+        self.window_size = window_size;
         self.recreate_swapchain = false;
         let (new_swapchain, new_images) = self
             .swapchain
@@ -298,9 +295,6 @@ impl Engine {
                 ..self.swapchain.create_info()
             })
             .expect("engine: failed to recreate swapchain");
-        let aspect_ratio =
-            new_swapchain.image_extent()[0] as f32 / new_swapchain.image_extent()[1] as f32;
-        self.camera.update_projection(aspect_ratio);
         self.swapchain = new_swapchain;
         let new_framebuffers =
             create_framebuffers(&self.memory_allocator, &new_images, &self.render_pass);

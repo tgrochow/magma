@@ -9,15 +9,13 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowId};
 
-use crate::engine::scene;
-use crate::engine::scene::Scene;
-
 mod engine;
 
 struct App {
     instance: Arc<Instance>,
+    window: Option<Arc<Window>>,
     engine: Option<engine::Engine>,
-    scene: Scene,
+    scene: Option<engine::scene::Scene>,
 }
 
 impl App {
@@ -35,8 +33,9 @@ impl App {
         .expect("failed to create Vulkan instance");
         App {
             instance: instance,
+            window: None,
             engine: None,
-            scene: scene::get_default_scene(),
+            scene: None,
         }
     }
 }
@@ -45,7 +44,14 @@ impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_attributes = Window::default_attributes().with_title("Magma v0.1.0");
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
-        self.engine = Some(engine::Engine::new(&self.instance, window));
+        let window_size = window.inner_size();
+        let aspect_ratio = window_size.width as f32 / window_size.height as f32;
+        self.window = Some(window);
+        self.engine = Some(engine::Engine::new(
+            &self.instance,
+            self.window.as_ref().unwrap().clone(),
+        ));
+        self.scene = Some(engine::scene::get_default_scene(aspect_ratio));
     }
 
     fn window_event(
@@ -59,15 +65,28 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::Resized(_) => {
+                let window_size = self.window.as_ref().unwrap().inner_size();
+                let aspect_ratio = window_size.width as f32 / window_size.height as f32;
                 self.engine.as_mut().unwrap().recreate_swapchain();
+                self.scene
+                    .as_mut()
+                    .unwrap()
+                    .camera
+                    .update_projection(aspect_ratio);
             }
             WindowEvent::RedrawRequested => {
                 self.scene
+                    .as_mut()
+                    .unwrap()
                     .models
                     .get_mut("cube2")
                     .unwrap()
                     .rotate(0.0, 0.0, 0.1);
-                self.engine.as_mut().unwrap().draw(&self.scene);
+                self.engine.as_mut().unwrap().draw(
+                    &self.scene.as_ref().unwrap(),
+                    self.window.as_mut().unwrap().inner_size(),
+                );
+                self.window.as_ref().unwrap().request_redraw();
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 if event.state == ElementState::Pressed {
@@ -76,10 +95,10 @@ impl ApplicationHandler for App {
                             event_loop.exit();
                         }
                         Key::Named(NamedKey::ArrowUp) => {
-                            self.engine.as_mut().unwrap().camera.move_forward()
+                            self.scene.as_mut().unwrap().camera.move_forward()
                         }
                         Key::Named(NamedKey::ArrowDown) => {
-                            self.engine.as_mut().unwrap().camera.move_backwards()
+                            self.scene.as_mut().unwrap().camera.move_backwards()
                         }
                         _ => {}
                     }

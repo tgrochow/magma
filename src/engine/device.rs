@@ -1,5 +1,4 @@
 use std::sync::Arc;
-
 use vulkano::device::physical::{PhysicalDevice, PhysicalDeviceType};
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
 use vulkano::device::{DeviceExtensions, Queue, QueueFlags};

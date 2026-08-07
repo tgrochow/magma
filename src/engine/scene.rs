@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 
+use crate::engine::camera;
 use crate::engine::model;
 use crate::engine::model::{Model, Normal, Position};
 
@@ -71,12 +72,14 @@ struct GLTFBuffer {
 
 pub struct Scene {
     pub models: HashMap<String, Model>,
+    pub camera: camera::Camera,
 }
 
 impl Scene {
-    pub fn new() -> Self {
+    pub fn new(aspect_ratio: f32) -> Self {
         Scene {
             models: HashMap::new(),
+            camera: camera::Camera::new(aspect_ratio),
         }
     }
 
@@ -165,8 +168,8 @@ fn load_indices(model_dir: &Path, mesh: &GLTFMesh, data: &GLTF) -> Vec<u16> {
     indices
 }
 
-pub fn get_default_scene() -> Scene {
-    let mut scene = Scene::new();
+pub fn get_default_scene(aspect_ratio: f32) -> Scene {
+    let mut scene = Scene::new(aspect_ratio);
     scene.load_model(Path::new("./models/suzanne.gltf"), "suzanne".to_string());
     let mut cube2 = model::get_cube();
     cube2.translate(Vec3 {
