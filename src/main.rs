@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::sync::Arc;
 use vulkano::VulkanLibrary;
+use vulkano::image::SampleCount;
 use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
 use vulkano::swapchain::Surface;
 use winit::application::ApplicationHandler;
@@ -52,6 +53,7 @@ impl ApplicationHandler for App {
         self.engine = Some(engine::Engine::new(
             &self.instance,
             self.window.as_ref().unwrap().clone(),
+            SampleCount::Sample4,
         ));
         self.scene = Some(scene::get_default_scene(aspect_ratio));
     }

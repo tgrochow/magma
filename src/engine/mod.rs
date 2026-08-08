@@ -8,7 +8,8 @@ use vulkano::command_buffer::{
 use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
 use vulkano::descriptor_set::{DescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, Queue};
-use vulkano::format::Format;
+use vulkano::format::{ClearValue, Format};
+use vulkano::image::SampleCount;
 use vulkano::image::view::ImageView;
 use vulkano::image::{Image, ImageCreateInfo, ImageType, ImageUsage};
 use vulkano::instance::Instance;
@@ -39,6 +40,7 @@ use crate::scene;
 use crate::shader;
 
 mod device;
+mod msaa;
 
 pub struct Engine {
     device: Arc<Device>,
@@ -56,10 +58,11 @@ pub struct Engine {
     pipeline: Arc<GraphicsPipeline>,
     previous_frame_end: Option<Box<dyn GpuFuture>>,
     recreate_swapchain: bool,
+    sample_count: SampleCount,
 }
 
 impl Engine {
-    pub fn new(instance: &Arc<Instance>, window: Arc<Window>) -> Self {
+    pub fn new(instance: &Arc<Instance>, window: Arc<Window>, sample_count: SampleCount) -> Self {
         let surface = Surface::from_window(instance.clone(), window.clone())
             .expect("engine: surface could not be created");
         let (_physical_device, device, queue) = device::init_device(instance, &surface);
@@ -98,7 +101,7 @@ impl Engine {
                     min_image_count: surface_capabilities.min_image_count.max(2),
                     image_format,
                     image_extent: window_size.into(),
-                    image_usage: ImageUsage::COLOR_ATTACHMENT,
+                    image_usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSFER_DST,
                     composite_alpha: surface_capabilities
                         .supported_composite_alpha
                         .into_iter()
@@ -109,30 +112,13 @@ impl Engine {
             )
             .unwrap()
         };
-        let render_pass = vulkano::single_pass_renderpass!(
-            device.clone(),
-            attachments: {
-                color: {
-                    format: swapchain.image_format(),
-                    samples: 1,
-                    load_op: Clear,
-                    store_op: Store,
-                },
-                depth_stencil: {
-                    format: Format::D16_UNORM,
-                    samples: 1,
-                    load_op: Clear,
-                    store_op: DontCare,
-                },
-            },
-            pass: {
-                color: [color],
-                depth_stencil: {depth_stencil},
-            },
-        )
-        .unwrap();
-        let framebuffers =
-            create_framebuffers(memory_allocator.clone(), &images, render_pass.clone());
+        let render_pass = create_render_pass(device.clone(), swapchain.clone(), sample_count);
+        let framebuffers = create_framebuffers(
+            memory_allocator.clone(),
+            &images,
+            render_pass.clone(),
+            sample_count,
+        );
         let vertex_shader = shader::mesh_vs::load(device.clone())
             .unwrap()
             .entry_point("main")
@@ -147,6 +133,7 @@ impl Engine {
             vertex_shader.clone(),
             fragment_shader.clone(),
             window_size,
+            sample_count,
         );
         let previous_frame_end = Some(sync::now(device.clone()).boxed());
         Engine {
@@ -165,6 +152,7 @@ impl Engine {
             pipeline: pipeline,
             previous_frame_end: previous_frame_end,
             recreate_swapchain: false,
+            sample_count: sample_count,
         }
     }
 
@@ -197,7 +185,7 @@ impl Engine {
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    clear_values: vec![Some([0.0, 0.0, 0.0, 1.0].into()), Some(1f32.into())],
+                    clear_values: get_clear_values(self.sample_count),
                     ..RenderPassBeginInfo::framebuffer(
                         self.framebuffers[image_index as usize].clone(),
                     )
@@ -297,6 +285,7 @@ impl Engine {
             self.memory_allocator.clone(),
             &new_images,
             self.render_pass.clone(),
+            self.sample_count,
         );
         let new_pipeline = create_pipeline(
             self.device.clone(),
@@ -304,6 +293,7 @@ impl Engine {
             self.vertex_shader.clone(),
             self.fragment_shader.clone(),
             window_size,
+            self.sample_count,
         );
         self.framebuffers = new_framebuffers;
         self.pipeline = new_pipeline;
@@ -315,6 +305,24 @@ impl Engine {
 }
 
 fn create_framebuffers(
+    memory_allocator: Arc<StandardMemoryAllocator>,
+    images: &[Arc<Image>],
+    render_pass: Arc<RenderPass>,
+    sample_count: SampleCount,
+) -> Vec<Arc<Framebuffer>> {
+    if sample_count == SampleCount::Sample1 {
+        create_framebuffers_without_msaa(memory_allocator.clone(), &images, render_pass.clone())
+    } else {
+        msaa::create_framebuffers(
+            memory_allocator.clone(),
+            &images,
+            render_pass.clone(),
+            sample_count,
+        )
+    }
+}
+
+fn create_framebuffers_without_msaa(
     memory_allocator: Arc<StandardMemoryAllocator>,
     images: &[Arc<Image>],
     render_pass: Arc<RenderPass>,
@@ -350,12 +358,53 @@ fn create_framebuffers(
         .collect::<Vec<_>>()
 }
 
+fn create_render_pass(
+    device: Arc<Device>,
+    swapchain: Arc<Swapchain>,
+    sample_count: SampleCount,
+) -> Arc<RenderPass> {
+    if sample_count == SampleCount::Sample1 {
+        create_render_pass_without_msaa(device.clone(), swapchain.clone())
+    } else {
+        msaa::create_render_pass(device.clone(), swapchain.clone(), sample_count)
+    }
+}
+
+fn create_render_pass_without_msaa(
+    device: Arc<Device>,
+    swapchain: Arc<Swapchain>,
+) -> Arc<RenderPass> {
+    vulkano::single_pass_renderpass!(
+        device.clone(),
+        attachments: {
+            color: {
+                format: swapchain.image_format(),
+                samples: 1,
+                load_op: Clear,
+                store_op: Store,
+            },
+            depth_stencil: {
+                format: Format::D16_UNORM,
+                samples: 1,
+                load_op: Clear,
+                store_op: DontCare,
+            },
+        },
+        pass: {
+            color: [color],
+            depth_stencil: {depth_stencil},
+        },
+    )
+    .unwrap()
+}
+
 fn create_pipeline(
     device: Arc<Device>,
     render_pass: Arc<RenderPass>,
     vs: EntryPoint,
     fs: EntryPoint,
     window_size: PhysicalSize<u32>,
+    sample_count: SampleCount,
 ) -> Arc<GraphicsPipeline> {
     let vertex_input_state = [
         scene::model::Position::per_vertex(),
@@ -397,7 +446,10 @@ fn create_pipeline(
                 depth: Some(DepthState::simple()),
                 ..Default::default()
             }),
-            multisample_state: Some(MultisampleState::default()),
+            multisample_state: Some(MultisampleState {
+                rasterization_samples: sample_count,
+                ..Default::default()
+            }),
             color_blend_state: Some(ColorBlendState::with_attachment_states(
                 subpass.num_color_attachments(),
                 ColorBlendAttachmentState::default(),
@@ -407,4 +459,16 @@ fn create_pipeline(
         },
     )
     .unwrap()
+}
+
+fn get_clear_values(sample_count: SampleCount) -> Vec<Option<ClearValue>> {
+    if sample_count == SampleCount::Sample1 {
+        get_clear_values_without_msaa()
+    } else {
+        msaa::get_clear_values()
+    }
+}
+
+fn get_clear_values_without_msaa() -> Vec<Option<ClearValue>> {
+    vec![Some([0.0, 0.0, 0.0, 1.0].into()), Some(1f32.into())]
 }
