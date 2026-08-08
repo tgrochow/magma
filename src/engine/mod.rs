@@ -131,7 +131,8 @@ impl Engine {
             },
         )
         .unwrap();
-        let framebuffers = create_framebuffers(&memory_allocator, &images, &render_pass);
+        let framebuffers =
+            create_framebuffers(memory_allocator.clone(), &images, render_pass.clone());
         let vertex_shader = shader::mesh_vs::load(device.clone())
             .unwrap()
             .entry_point("main")
@@ -141,8 +142,8 @@ impl Engine {
             .entry_point("main")
             .unwrap();
         let pipeline = create_pipeline(
-            &device,
-            &render_pass,
+            device.clone(),
+            render_pass.clone(),
             vertex_shader.clone(),
             fragment_shader.clone(),
             window_size,
@@ -292,11 +293,14 @@ impl Engine {
             })
             .expect("engine: failed to recreate swapchain");
         self.swapchain = new_swapchain;
-        let new_framebuffers =
-            create_framebuffers(&self.memory_allocator, &new_images, &self.render_pass);
+        let new_framebuffers = create_framebuffers(
+            self.memory_allocator.clone(),
+            &new_images,
+            self.render_pass.clone(),
+        );
         let new_pipeline = create_pipeline(
-            &self.device,
-            &self.render_pass,
+            self.device.clone(),
+            self.render_pass.clone(),
             self.vertex_shader.clone(),
             self.fragment_shader.clone(),
             window_size,
@@ -311,9 +315,9 @@ impl Engine {
 }
 
 fn create_framebuffers(
-    memory_allocator: &Arc<StandardMemoryAllocator>,
+    memory_allocator: Arc<StandardMemoryAllocator>,
     images: &[Arc<Image>],
-    render_pass: &Arc<RenderPass>,
+    render_pass: Arc<RenderPass>,
 ) -> Vec<Arc<Framebuffer>> {
     let depth_buffer = ImageView::new_default(
         Image::new(
@@ -347,8 +351,8 @@ fn create_framebuffers(
 }
 
 fn create_pipeline(
-    device: &Arc<Device>,
-    render_pass: &Arc<RenderPass>,
+    device: Arc<Device>,
+    render_pass: Arc<RenderPass>,
     vs: EntryPoint,
     fs: EntryPoint,
     window_size: PhysicalSize<u32>,
