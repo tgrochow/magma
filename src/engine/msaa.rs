@@ -51,25 +51,26 @@ pub fn create_framebuffers(
     render_pass: Arc<RenderPass>,
     sample_count: SampleCount,
 ) -> Vec<Arc<Framebuffer>> {
-    let depth_buffer = ImageView::new_default(
-        Image::new(
-            memory_allocator.clone(),
-            ImageCreateInfo {
-                image_type: ImageType::Dim2d,
-                format: Format::D16_UNORM,
-                extent: images[0].extent(),
-                usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
-                samples: sample_count,
-                ..Default::default()
-            },
-            AllocationCreateInfo::default(),
-        )
-        .unwrap(),
-    )
-    .unwrap();
     images
         .iter()
         .map(|image| {
+            let depth_view = ImageView::new_default(
+                Image::new(
+                    memory_allocator.clone(),
+                    ImageCreateInfo {
+                        image_type: ImageType::Dim2d,
+                        format: Format::D16_UNORM,
+                        extent: image.extent(),
+                        usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT
+                            | ImageUsage::TRANSIENT_ATTACHMENT,
+                        samples: sample_count,
+                        ..Default::default()
+                    },
+                    AllocationCreateInfo::default(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
             let msaa_view = ImageView::new_default(
                 Image::new(
                     memory_allocator.clone(),
@@ -90,11 +91,7 @@ pub fn create_framebuffers(
             Framebuffer::new(
                 render_pass.clone(),
                 FramebufferCreateInfo {
-                    attachments: vec![
-                        msaa_view.clone(),
-                        resolve_view.clone(),
-                        depth_buffer.clone(),
-                    ],
+                    attachments: vec![msaa_view.clone(), resolve_view.clone(), depth_view.clone()],
                     ..Default::default()
                 },
             )
