@@ -155,7 +155,8 @@
 					0.032952211797237396,
 					1
 				],
-				"metallicFactor":0
+				"metallicFactor":0,
+				"roughnessFactor":1.0
 			}
 		}
 	],
@@ -843,7 +844,7 @@
 	"buffers":[
 		{
 			"byteLength":549200,
-			"uri":"well_01.bin"
+			"uri":"well.bin"
 		}
 	]
 }

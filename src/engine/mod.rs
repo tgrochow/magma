@@ -126,11 +126,11 @@ impl Engine {
             render_pass.clone(),
             sample_count,
         );
-        let vertex_shader = shader::mesh_vs::load(device.clone())
+        let vertex_shader = shader::pbr_vs::load(device.clone())
             .unwrap()
             .entry_point("main")
             .unwrap();
-        let fragment_shader = shader::debug_fs::load(device.clone())
+        let fragment_shader = shader::pbr_fs::load(device.clone())
             .unwrap()
             .entry_point("main")
             .unwrap();
@@ -241,7 +241,13 @@ impl Engine {
         camera: &scene::camera::Camera,
     ) {
         for primitive in &model.primitives {
-            self.draw_primitive(builder, model, &primitive, camera);
+            self.draw_primitive(
+                builder,
+                model,
+                &primitive,
+                camera,
+                &model.materials[primitive.material_index],
+            );
         }
     }
 
@@ -251,16 +257,18 @@ impl Engine {
         model: &scene::model::Model,
         primitive: &scene::model::Primitive,
         camera: &scene::camera::Camera,
+        material: &scene::gltf::Material,
     ) {
         let pos_buffer = primitive.create_vertex_buffer(&self.memory_allocator);
         let normals_buffer = primitive.create_normals_buffer(&self.memory_allocator);
         let index_buffer = primitive.create_index_buffer(&self.memory_allocator);
         let index_buffer_length = index_buffer.len() as u32;
         let uniform_buffer = {
-            let uniform_data = shader::mesh_vs::Data {
+            let uniform_data = shader::pbr_vs::Data {
                 world: model.get_model_matrix().to_cols_array_2d(),
                 view: camera.get_view_matrix().to_cols_array_2d(),
                 proj: camera.get_projection_matrix().to_cols_array_2d(),
+                color: material.pbr.color,
             };
             let buffer = self.uniform_buffer_allocator.allocate_sized().unwrap();
             *buffer.write().unwrap() = uniform_data;

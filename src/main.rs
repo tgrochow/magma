@@ -61,8 +61,8 @@ impl ApplicationHandler for App {
             self.window.as_ref().unwrap().clone(),
             SampleCount::Sample16,
         ));
-        let mut scene = scene::get_default_scene(aspect_ratio);
-        scene.load_model(Path::new("./models/well_01.gltf"), "well".to_string());
+        let mut scene = scene::Scene::new(aspect_ratio);
+        scene.load_model(Path::new("./models/well.gltf"), "well".to_string());
         self.scene = Some(scene);
     }
 
@@ -88,13 +88,6 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 let frame_start = Instant::now();
-                self.scene
-                    .as_mut()
-                    .unwrap()
-                    .models
-                    .get_mut("cube2")
-                    .unwrap()
-                    .rotate(0.0, 0.0, 0.1);
                 self.engine.as_mut().unwrap().draw(
                     &self.scene.as_ref().unwrap(),
                     self.window.as_mut().unwrap().inner_size(),

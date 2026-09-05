@@ -5,11 +5,13 @@ use vulkano::buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Sub
 use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator};
 use vulkano::pipeline::graphics::vertex_input::Vertex;
 
+use crate::scene::gltf::Material;
+
 #[derive(BufferContents, Vertex, Clone)]
 #[repr(C)]
 pub struct Position {
     #[format(R32G32B32_SFLOAT)]
-    position: [f32; 3],
+    pub position: [f32; 3],
 }
 
 impl Position {
@@ -24,7 +26,7 @@ impl Position {
 #[repr(C)]
 pub struct Normal {
     #[format(R32G32B32_SFLOAT)]
-    normal: [f32; 3],
+    pub normal: [f32; 3],
 }
 
 impl Normal {
@@ -37,6 +39,7 @@ pub struct Primitive {
     pub positions: Vec<Position>,
     pub normals: Vec<Normal>,
     pub indices: Vec<u16>,
+    pub material_index: usize,
 }
 
 impl Primitive {
@@ -103,6 +106,7 @@ impl Primitive {
 
 pub struct Model {
     pub primitives: Vec<Primitive>,
+    pub materials: Vec<Material>,
     translation: Vec3,
     rotation_x: f32,
     rotation_y: f32,
@@ -110,9 +114,10 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(primitives: Vec<Primitive>) -> Self {
+    pub fn new(primitives: Vec<Primitive>, materials: Vec<Material>) -> Self {
         Model {
             primitives: primitives,
+            materials: materials,
             translation: Vec3 {
                 x: 0.0,
                 y: 0.0,
@@ -154,165 +159,4 @@ impl Model {
     pub fn translate(&mut self, vt: Vec3) {
         self.translation += vt;
     }
-}
-
-pub fn get_cube() -> Model {
-    let positions = vec![
-        Position {
-            position: [-0.5, -0.5, 0.5],
-        },
-        Position {
-            position: [0.5, -0.5, 0.5],
-        },
-        Position {
-            position: [-0.5, 0.5, 0.5],
-        },
-        Position {
-            position: [0.5, 0.5, 0.5],
-        },
-        Position {
-            position: [-0.5, -0.5, -0.5],
-        },
-        Position {
-            position: [0.5, -0.5, -0.5],
-        },
-        Position {
-            position: [-0.5, 0.5, -0.5],
-        },
-        Position {
-            position: [0.5, 0.5, -0.5],
-        },
-        Position {
-            position: [-0.5, -0.5, 0.5],
-        },
-        Position {
-            position: [-0.5, -0.5, -0.5],
-        },
-        Position {
-            position: [-0.5, 0.5, 0.5],
-        },
-        Position {
-            position: [-0.5, 0.5, -0.5],
-        },
-        Position {
-            position: [0.5, -0.5, 0.5],
-        },
-        Position {
-            position: [0.5, -0.5, -0.5],
-        },
-        Position {
-            position: [0.5, 0.5, 0.5],
-        },
-        Position {
-            position: [0.5, 0.5, -0.5],
-        },
-        Position {
-            position: [-0.5, -0.5, -0.5],
-        },
-        Position {
-            position: [0.5, -0.5, -0.5],
-        },
-        Position {
-            position: [-0.5, -0.5, 0.5],
-        },
-        Position {
-            position: [0.5, -0.5, 0.5],
-        },
-        Position {
-            position: [-0.5, 0.5, -0.5],
-        },
-        Position {
-            position: [0.5, 0.5, -0.5],
-        },
-        Position {
-            position: [-0.5, 0.5, 0.5],
-        },
-        Position {
-            position: [0.5, 0.5, 0.5],
-        },
-    ];
-    let normals = vec![
-        Normal {
-            normal: [0.0, 0.0, 1.0],
-        },
-        Normal {
-            normal: [0.0, 0.0, 1.0],
-        },
-        Normal {
-            normal: [0.0, 0.0, 1.0],
-        },
-        Normal {
-            normal: [0.0, 0.0, 1.0],
-        },
-        Normal {
-            normal: [0.0, 0.0, -1.0],
-        },
-        Normal {
-            normal: [0.0, 0.0, -1.0],
-        },
-        Normal {
-            normal: [0.0, 0.0, -1.0],
-        },
-        Normal {
-            normal: [0.0, 0.0, -1.0],
-        },
-        Normal {
-            normal: [-1.0, 0.0, 0.0],
-        },
-        Normal {
-            normal: [-1.0, 0.0, 0.0],
-        },
-        Normal {
-            normal: [-1.0, 0.0, 0.0],
-        },
-        Normal {
-            normal: [-1.0, 0.0, 0.0],
-        },
-        Normal {
-            normal: [1.0, 0.0, 0.0],
-        },
-        Normal {
-            normal: [1.0, 0.0, 0.0],
-        },
-        Normal {
-            normal: [1.0, 0.0, 0.0],
-        },
-        Normal {
-            normal: [1.0, 0.0, 0.0],
-        },
-        Normal {
-            normal: [0.0, -1.0, 0.0],
-        },
-        Normal {
-            normal: [0.0, -1.0, 0.0],
-        },
-        Normal {
-            normal: [0.0, -1.0, 0.0],
-        },
-        Normal {
-            normal: [0.0, -1.0, 0.0],
-        },
-        Normal {
-            normal: [0.0, 1.0, 0.0],
-        },
-        Normal {
-            normal: [0.0, 1.0, 0.0],
-        },
-        Normal {
-            normal: [0.0, 1.0, 0.0],
-        },
-        Normal {
-            normal: [0.0, 1.0, 0.0],
-        },
-    ];
-    let indices = vec![
-        0, 1, 2, 1, 2, 3, 4, 5, 6, 5, 6, 7, 8, 9, 10, 9, 10, 11, 12, 13, 14, 13, 14, 15, 16, 17,
-        18, 17, 18, 19, 20, 21, 22, 21, 22, 23,
-    ];
-    let primitives = vec![Primitive {
-        positions: positions,
-        normals: normals,
-        indices: indices,
-    }];
-    Model::new(primitives)
 }
