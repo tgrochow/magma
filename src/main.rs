@@ -1,5 +1,7 @@
 use std::error::Error;
+use std::path::Path;
 use std::sync::Arc;
+use std::time::Instant;
 use vulkano::VulkanLibrary;
 use vulkano::image::SampleCount;
 use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo};
@@ -19,6 +21,10 @@ struct App {
     window: Option<Arc<Window>>,
     engine: Option<engine::Engine>,
     scene: Option<scene::Scene>,
+}
+
+struct Statistic {
+    frame_rates: [i32; 10],
 }
 
 impl App {
@@ -53,9 +59,11 @@ impl ApplicationHandler for App {
         self.engine = Some(engine::Engine::new(
             &self.instance,
             self.window.as_ref().unwrap().clone(),
-            SampleCount::Sample4,
+            SampleCount::Sample16,
         ));
-        self.scene = Some(scene::get_default_scene(aspect_ratio));
+        let mut scene = scene::get_default_scene(aspect_ratio);
+        scene.load_model(Path::new("./models/well_01.gltf"), "well".to_string());
+        self.scene = Some(scene);
     }
 
     fn window_event(
@@ -79,6 +87,7 @@ impl ApplicationHandler for App {
                     .update_projection(aspect_ratio);
             }
             WindowEvent::RedrawRequested => {
+                let frame_start = Instant::now();
                 self.scene
                     .as_mut()
                     .unwrap()
@@ -90,6 +99,9 @@ impl ApplicationHandler for App {
                     &self.scene.as_ref().unwrap(),
                     self.window.as_mut().unwrap().inner_size(),
                 );
+                let frame_rate = 1.0 / frame_start.elapsed().as_secs_f32();
+                let title = format!("FPS: {}", frame_rate.round() as u32);
+                self.window.as_mut().unwrap().set_title(&title);
                 self.window.as_ref().unwrap().request_redraw();
             }
             WindowEvent::KeyboardInput { event, .. } => {

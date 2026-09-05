@@ -20,11 +20,11 @@ struct GLTF {
 #[derive(Deserialize)]
 struct GLTFMesh {
     name: String,
-    primitives: Vec<GLTFPrimitives>,
+    primitives: Vec<GLTFPrimitive>,
 }
 
 #[derive(Deserialize)]
-struct GLTFPrimitives {
+struct GLTFPrimitive {
     attributes: GLTFAttributes,
     #[serde(rename = "indices")]
     indices_accessor_index: usize,
@@ -88,23 +88,30 @@ impl Scene {
         let data: GLTF = serde_json::from_reader(reader).expect("engine: couldn't parse file");
         let model_dir = path.parent().unwrap();
         for mesh in &data.meshes {
-            println!("scene: load model {}", mesh.name);
-            let positions = load_positions(model_dir, &mesh, &data);
-            let normals = load_normals(model_dir, &mesh, &data);
-            let indices = load_indices(model_dir, &mesh, &data);
-            let mut model = model::Model::new(positions, normals, indices);
-            model.translate(Vec3 {
-                x: 0.0,
-                y: 0.0,
-                z: -3.0,
-            });
+            let mut primitives = Vec::new();
+            for primitive in &mesh.primitives {
+                let positions = load_positions(model_dir, &primitive, &data);
+                let normals = load_normals(model_dir, &primitive, &data);
+                let indices = load_indices(model_dir, &primitive, &data);
+                let primitive = model::Primitive {
+                    positions: positions,
+                    normals: normals,
+                    indices: indices,
+                };
+                primitives.push(primitive);
+            }
+            let model = model::Model::new(primitives);
             self.models.insert(name.clone(), model);
         }
     }
 }
 
-fn load_positions(model_dir: &Path, mesh: &GLTFMesh, data: &GLTF) -> Vec<model::Position> {
-    let pos_acc_index = mesh.primitives[0].attributes.positions_accessor_index;
+fn load_positions(
+    model_dir: &Path,
+    primitive: &GLTFPrimitive,
+    data: &GLTF,
+) -> Vec<model::Position> {
+    let pos_acc_index = primitive.attributes.positions_accessor_index;
     let pos_acc = &data.accessors[pos_acc_index];
     let pos_buffer_view = &data.buffer_views[pos_acc.buffer_view_index];
     let pos_buffer = &data.buffers[pos_buffer_view.buffer_index];
@@ -125,8 +132,8 @@ fn load_positions(model_dir: &Path, mesh: &GLTFMesh, data: &GLTF) -> Vec<model::
     positions
 }
 
-fn load_normals(model_dir: &Path, mesh: &GLTFMesh, data: &GLTF) -> Vec<model::Normal> {
-    let pos_acc_index = mesh.primitives[0].attributes.normals_accessor_index;
+fn load_normals(model_dir: &Path, primitive: &GLTFPrimitive, data: &GLTF) -> Vec<model::Normal> {
+    let pos_acc_index = primitive.attributes.normals_accessor_index;
     let pos_acc = &data.accessors[pos_acc_index];
     let pos_buffer_view = &data.buffer_views[pos_acc.buffer_view_index];
     let pos_buffer = &data.buffers[pos_buffer_view.buffer_index];
@@ -147,8 +154,8 @@ fn load_normals(model_dir: &Path, mesh: &GLTFMesh, data: &GLTF) -> Vec<model::No
     normals
 }
 
-fn load_indices(model_dir: &Path, mesh: &GLTFMesh, data: &GLTF) -> Vec<u16> {
-    let acc_index = mesh.primitives[0].indices_accessor_index;
+fn load_indices(model_dir: &Path, primitive: &GLTFPrimitive, data: &GLTF) -> Vec<u16> {
+    let acc_index = primitive.indices_accessor_index;
     let acc = &data.accessors[acc_index];
     let buffer_view = &data.buffer_views[acc.buffer_view_index];
     let buffer = &data.buffers[buffer_view.buffer_index];
@@ -169,7 +176,7 @@ fn load_indices(model_dir: &Path, mesh: &GLTFMesh, data: &GLTF) -> Vec<u16> {
 
 pub fn get_default_scene(aspect_ratio: f32) -> Scene {
     let mut scene = Scene::new(aspect_ratio);
-    scene.load_model(Path::new("./models/suzanne.gltf"), "suzanne".to_string());
+    // scene.load_model(Path::new("./models/suzanne.gltf"), "suzanne".to_string());
     let mut cube2 = model::get_cube();
     cube2.translate(Vec3 {
         x: 3.0,

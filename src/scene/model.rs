@@ -33,33 +33,13 @@ impl Normal {
     }
 }
 
-pub struct Model {
-    positions: Vec<Position>,
-    normals: Vec<Normal>,
-    indices: Vec<u16>,
-    translation: Vec3,
-    rotation_x: f32,
-    rotation_y: f32,
-    rotation_z: f32,
+pub struct Primitive {
+    pub positions: Vec<Position>,
+    pub normals: Vec<Normal>,
+    pub indices: Vec<u16>,
 }
 
-impl Model {
-    pub fn new(positions: Vec<Position>, normals: Vec<Normal>, indices: Vec<u16>) -> Self {
-        Model {
-            positions: positions,
-            normals: normals,
-            indices: indices,
-            translation: Vec3 {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            rotation_x: 0.0,
-            rotation_y: 0.0,
-            rotation_z: 0.0,
-        }
-    }
-
+impl Primitive {
     pub fn create_vertex_buffer(
         &self,
         memory_allocator: &Arc<StandardMemoryAllocator>,
@@ -118,6 +98,30 @@ impl Model {
             self.indices.clone(),
         )
         .unwrap()
+    }
+}
+
+pub struct Model {
+    pub primitives: Vec<Primitive>,
+    translation: Vec3,
+    rotation_x: f32,
+    rotation_y: f32,
+    rotation_z: f32,
+}
+
+impl Model {
+    pub fn new(primitives: Vec<Primitive>) -> Self {
+        Model {
+            primitives: primitives,
+            translation: Vec3 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            rotation_x: 0.0,
+            rotation_y: 0.0,
+            rotation_z: 0.0,
+        }
     }
 
     pub fn get_model_matrix(&self) -> Mat4 {
@@ -305,5 +309,10 @@ pub fn get_cube() -> Model {
         0, 1, 2, 1, 2, 3, 4, 5, 6, 5, 6, 7, 8, 9, 10, 9, 10, 11, 12, 13, 14, 13, 14, 15, 16, 17,
         18, 17, 18, 19, 20, 21, 22, 21, 22, 23,
     ];
-    Model::new(positions, normals, indices)
+    let primitives = vec![Primitive {
+        positions: positions,
+        normals: normals,
+        indices: indices,
+    }];
+    Model::new(primitives)
 }

@@ -10,7 +10,7 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(aspect_ratio: f32) -> Self {
-        let pos = Vec3::new(0.0, 0.0, 1.0);
+        let pos = Vec3::new(0.0, 2.0, 5.0);
         let dir = Vec3::new(0.0, 0.0, -1.0);
         let up = Vec3::new(0.0, -1.0, 1.0);
         Self {

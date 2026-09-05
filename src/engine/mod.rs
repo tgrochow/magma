@@ -65,7 +65,14 @@ impl Engine {
     pub fn new(instance: &Arc<Instance>, window: Arc<Window>, sample_count: SampleCount) -> Self {
         let surface = Surface::from_window(instance.clone(), window.clone())
             .expect("engine: surface could not be created");
-        let (_physical_device, device, queue) = device::init_device(instance, &surface);
+        let (physical_device, device, queue) = device::init_device(instance, &surface);
+        let properties = physical_device.properties();
+
+        let color_counts = properties.framebuffer_color_sample_counts;
+        let depth_counts = properties.framebuffer_depth_sample_counts;
+
+        println!("Color sample counts: {color_counts:?}");
+        println!("Depth sample counts: {depth_counts:?}");
         let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
         let descriptor_set_allocator = Arc::new(StandardDescriptorSetAllocator::new(
             device.clone(),
@@ -233,9 +240,21 @@ impl Engine {
         model: &scene::model::Model,
         camera: &scene::camera::Camera,
     ) {
-        let pos_buffer = model.create_vertex_buffer(&self.memory_allocator);
-        let normals_buffer = model.create_normals_buffer(&self.memory_allocator);
-        let index_buffer = model.create_index_buffer(&self.memory_allocator);
+        for primitive in &model.primitives {
+            self.draw_primitive(builder, model, &primitive, camera);
+        }
+    }
+
+    fn draw_primitive(
+        &self,
+        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        model: &scene::model::Model,
+        primitive: &scene::model::Primitive,
+        camera: &scene::camera::Camera,
+    ) {
+        let pos_buffer = primitive.create_vertex_buffer(&self.memory_allocator);
+        let normals_buffer = primitive.create_normals_buffer(&self.memory_allocator);
+        let index_buffer = primitive.create_index_buffer(&self.memory_allocator);
         let index_buffer_length = index_buffer.len() as u32;
         let uniform_buffer = {
             let uniform_data = shader::mesh_vs::Data {
