@@ -41,6 +41,7 @@ use crate::shader;
 
 mod device;
 mod msaa;
+mod statistic;
 
 pub struct Engine {
     device: Arc<Device>,
@@ -59,6 +60,7 @@ pub struct Engine {
     previous_frame_end: Option<Box<dyn GpuFuture>>,
     recreate_swapchain: bool,
     sample_count: SampleCount,
+    statistik: statistic::Statistic,
 }
 
 impl Engine {
@@ -160,6 +162,7 @@ impl Engine {
             previous_frame_end: previous_frame_end,
             recreate_swapchain: false,
             sample_count: sample_count,
+            statistik: statistic::Statistic::new(),
         }
     }
 
@@ -233,6 +236,7 @@ impl Engine {
                 self.previous_frame_end = Some(sync::now(self.device.clone()).boxed());
             }
         }
+        self.statistik.tick();
     }
 
     fn draw_model(
@@ -347,6 +351,10 @@ impl Engine {
 
     pub fn recreate_swapchain(&mut self) {
         self.recreate_swapchain = true;
+    }
+
+    pub fn get_fps(&self) -> i32 {
+        return self.statistik.calc_fps();
     }
 }
 

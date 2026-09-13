@@ -21,10 +21,7 @@ struct App {
     window: Option<Arc<Window>>,
     engine: Option<engine::Engine>,
     scene: Option<scene::Scene>,
-}
-
-struct Statistic {
-    frame_rates: [i32; 10],
+    fps_updated: Instant,
 }
 
 impl App {
@@ -45,6 +42,7 @@ impl App {
             window: None,
             engine: None,
             scene: None,
+            fps_updated: Instant::now(),
         }
     }
 }
@@ -87,14 +85,18 @@ impl ApplicationHandler for App {
                     .update_projection(aspect_ratio);
             }
             WindowEvent::RedrawRequested => {
-                let frame_start = Instant::now();
                 self.engine.as_mut().unwrap().draw(
                     &self.scene.as_ref().unwrap(),
                     self.window.as_mut().unwrap().inner_size(),
                 );
-                let frame_rate = 1.0 / frame_start.elapsed().as_secs_f32();
-                let title = format!("FPS: {}", frame_rate.round() as u32);
-                self.window.as_mut().unwrap().set_title(&title);
+                if self.fps_updated.elapsed().as_secs() >= 5 {
+                    let fps = self.engine.as_ref().unwrap().get_fps();
+                    if fps > 0 {
+                        let title = format!("Magma v0.1.0 - FPS: {}", fps);
+                        self.window.as_mut().unwrap().set_title(&title);
+                        self.fps_updated = Instant::now();
+                    }
+                }
                 self.window.as_ref().unwrap().request_redraw();
             }
             WindowEvent::KeyboardInput { event, .. } => {
