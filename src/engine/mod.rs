@@ -263,12 +263,20 @@ impl Engine {
         let normals_buffer = primitive.create_normals_buffer(&self.memory_allocator);
         let index_buffer = primitive.create_index_buffer(&self.memory_allocator);
         let index_buffer_length = index_buffer.len() as u32;
-        let uniform_buffer = {
+        let vs_uniform_buffer = {
             let uniform_data = shader::pbr_vs::Data {
                 world: model.get_model_matrix().to_cols_array_2d(),
                 view: camera.get_view_matrix().to_cols_array_2d(),
                 proj: camera.get_projection_matrix().to_cols_array_2d(),
-                color: material.pbr.color,
+            };
+            let buffer = self.uniform_buffer_allocator.allocate_sized().unwrap();
+            *buffer.write().unwrap() = uniform_data;
+            buffer
+        };
+        let fs_uniform_buffer = {
+            let pos = camera.get_position();
+            let uniform_data = shader::pbr_fs::CameraData {
+                pos: pos.to_array(),
             };
             let buffer = self.uniform_buffer_allocator.allocate_sized().unwrap();
             *buffer.write().unwrap() = uniform_data;
@@ -278,10 +286,18 @@ impl Engine {
         let descriptor_set = DescriptorSet::new(
             self.descriptor_set_allocator.clone(),
             layout.clone(),
-            [WriteDescriptorSet::buffer(0, uniform_buffer)],
+            [
+                WriteDescriptorSet::buffer(0, vs_uniform_buffer),
+                WriteDescriptorSet::buffer(1, fs_uniform_buffer),
+            ],
             [],
         )
         .unwrap();
+        let push_constants = shader::pbr_fs::PushConstantData {
+            color: material.pbr.color,
+            mettalic: material.pbr.mettalic,
+            roughness: material.pbr.roughness,
+        };
         builder
             .bind_descriptor_sets(
                 PipelineBindPoint::Graphics,
@@ -293,6 +309,8 @@ impl Engine {
             .bind_vertex_buffers(0, (pos_buffer, normals_buffer))
             .unwrap()
             .bind_index_buffer(index_buffer)
+            .unwrap()
+            .push_constants(self.pipeline.layout().clone(), 0, push_constants)
             .unwrap();
         unsafe { builder.draw_indexed(index_buffer_length, 1, 0, 0, 0) }.unwrap();
     }
@@ -498,5 +516,5 @@ fn get_clear_values(sample_count: SampleCount) -> Vec<Option<ClearValue>> {
 }
 
 fn get_clear_values_without_msaa() -> Vec<Option<ClearValue>> {
-    vec![Some([0.0, 0.0, 0.0, 1.0].into()), Some(1f32.into())]
+    vec![Some([0.8, 0.8, 0.8, 1.0].into()), Some(1f32.into())]
 }

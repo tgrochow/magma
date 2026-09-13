@@ -101,5 +101,5 @@ pub fn create_framebuffers(
 }
 
 pub fn get_clear_values() -> Vec<Option<ClearValue>> {
-    vec![Some([0.0, 0.0, 0.0, 1.0].into()), None, Some(1f32.into())]
+    vec![Some([0.8, 0.8, 0.8, 1.0].into()), None, Some(1f32.into())]
 }

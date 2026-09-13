@@ -12,7 +12,7 @@ impl Camera {
     pub fn new(aspect_ratio: f32) -> Self {
         let pos = Vec3::new(0.0, 2.0, 5.0);
         let dir = Vec3::new(0.0, 0.0, -1.0);
-        let up = Vec3::new(0.0, -1.0, 1.0);
+        let up = Vec3::new(0.0, -1.0, 0.0);
         Self {
             pos: pos,
             dir: dir,
@@ -20,6 +20,10 @@ impl Camera {
             proj: get_projection_matrix(aspect_ratio),
             view: get_view_matrix(pos, dir, up),
         }
+    }
+
+    pub fn get_position(&self) -> Vec3 {
+        return self.pos.clone();
     }
 
     pub fn get_projection_matrix(&self) -> Mat4 {

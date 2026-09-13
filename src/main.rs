@@ -59,7 +59,7 @@ impl ApplicationHandler for App {
         self.engine = Some(engine::Engine::new(
             &self.instance,
             self.window.as_ref().unwrap().clone(),
-            SampleCount::Sample16,
+            SampleCount::Sample1,
         ));
         let mut scene = scene::Scene::new(aspect_ratio);
         scene.load_model(Path::new("./models/well.gltf"), "well".to_string());
@@ -77,6 +77,7 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::Resized(_) => {
+                println!("reszied");
                 let window_size = self.window.as_ref().unwrap().inner_size();
                 let aspect_ratio = window_size.width as f32 / window_size.height as f32;
                 self.engine.as_mut().unwrap().recreate_swapchain();
