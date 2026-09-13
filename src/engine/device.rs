@@ -44,9 +44,6 @@ pub fn select_physical_device(
             p.queue_family_properties()
                 .iter()
                 .enumerate()
-                // Find the first first queue family that is suitable.
-                // If none is found, `None` is returned to `filter_map`,
-                // which disqualifies this physical device.
                 .position(|(i, q)| {
                     q.queue_flags.contains(QueueFlags::GRAPHICS)
                         && p.surface_support(i as u32, &surface).unwrap_or(false)
@@ -58,9 +55,6 @@ pub fn select_physical_device(
             PhysicalDeviceType::IntegratedGpu => 1,
             PhysicalDeviceType::VirtualGpu => 2,
             PhysicalDeviceType::Cpu => 3,
-            // Note that there exists `PhysicalDeviceType::Other`, however,
-            // `PhysicalDeviceType` is a non-exhaustive enum. Thus, one should
-            // match wildcard `_` to catch all unknown device types.
             _ => 4,
         })
         .expect("engine: no device available")

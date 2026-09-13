@@ -39,6 +39,7 @@ use winit::window::Window;
 use crate::scene;
 use crate::shader;
 
+mod config;
 mod device;
 mod msaa;
 mod statistic;
@@ -59,7 +60,7 @@ pub struct Engine {
     pipeline: Arc<GraphicsPipeline>,
     previous_frame_end: Option<Box<dyn GpuFuture>>,
     recreate_swapchain: bool,
-    sample_count: SampleCount,
+    config: config::Config,
     statistik: statistic::Statistic,
 }
 
@@ -68,13 +69,7 @@ impl Engine {
         let surface = Surface::from_window(instance.clone(), window.clone())
             .expect("engine: surface could not be created");
         let (physical_device, device, queue) = device::init_device(instance, &surface);
-        let properties = physical_device.properties();
-
-        let color_counts = properties.framebuffer_color_sample_counts;
-        let depth_counts = properties.framebuffer_depth_sample_counts;
-
-        println!("Color sample counts: {color_counts:?}");
-        println!("Depth sample counts: {depth_counts:?}");
+        let config = config::Config::new(physical_device, sample_count);
         let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
         let descriptor_set_allocator = Arc::new(StandardDescriptorSetAllocator::new(
             device.clone(),
@@ -161,7 +156,7 @@ impl Engine {
             pipeline: pipeline,
             previous_frame_end: previous_frame_end,
             recreate_swapchain: false,
-            sample_count: sample_count,
+            config: config,
             statistik: statistic::Statistic::new(),
         }
     }
@@ -196,7 +191,7 @@ impl Engine {
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    clear_values: get_clear_values(self.sample_count),
+                    clear_values: get_clear_values(self.config.sample_count),
                     ..RenderPassBeginInfo::framebuffer(
                         self.framebuffers[image_index as usize].clone(),
                     )
@@ -335,7 +330,7 @@ impl Engine {
             self.memory_allocator.clone(),
             &new_images,
             self.render_pass.clone(),
-            self.sample_count,
+            self.config.sample_count,
         );
         let new_pipeline = create_pipeline(
             self.device.clone(),
@@ -343,7 +338,7 @@ impl Engine {
             self.vertex_shader.clone(),
             self.fragment_shader.clone(),
             window_size,
-            self.sample_count,
+            self.config.sample_count,
         );
         self.framebuffers = new_framebuffers;
         self.pipeline = new_pipeline;

@@ -89,7 +89,7 @@ impl ApplicationHandler for App {
                     &self.scene.as_ref().unwrap(),
                     self.window.as_mut().unwrap().inner_size(),
                 );
-                if self.fps_updated.elapsed().as_secs() >= 5 {
+                if self.fps_updated.elapsed().as_secs() >= 3 {
                     let fps = self.engine.as_ref().unwrap().get_fps();
                     if fps > 0 {
                         let title = format!("Magma v0.1.0 - FPS: {}", fps);
