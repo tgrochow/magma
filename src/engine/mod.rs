@@ -167,7 +167,6 @@ impl Engine {
         if window_size.width == 0 || window_size.height == 0 {
             return;
         }
-        self.previous_frame_end.as_mut().unwrap().cleanup_finished();
         if self.recreate_swapchain {
             self.update_window_size(window_size);
         }
@@ -189,6 +188,8 @@ impl Engine {
             CommandBufferUsage::OneTimeSubmit,
         )
         .unwrap();
+        // very important: call cleanup_finished before begin_render_pass
+        self.previous_frame_end.as_mut().unwrap().cleanup_finished();
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
