@@ -285,7 +285,8 @@ impl Engine {
             *buffer.write().unwrap() = uniform_data;
             buffer
         };
-        let lights_buffer = lighting.create_light_buffer(self.memory_allocator.clone());
+        let point_lights_buffer = lighting.create_point_light_buffer(self.memory_allocator.clone());
+        let dir_lights_buffer = lighting.create_dir_light_buffer(self.memory_allocator.clone());
         let layout = &self.pipeline.layout().set_layouts()[0];
         let descriptor_set = DescriptorSet::new(
             self.descriptor_set_allocator.clone(),
@@ -293,16 +294,18 @@ impl Engine {
             [
                 WriteDescriptorSet::buffer(0, vs_uniform_buffer),
                 WriteDescriptorSet::buffer(1, fs_uniform_buffer),
-                WriteDescriptorSet::buffer(2, lights_buffer),
+                WriteDescriptorSet::buffer(2, point_lights_buffer),
+                WriteDescriptorSet::buffer(3, dir_lights_buffer),
             ],
             [],
         )
         .unwrap();
         let push_constants = shader::pbr_fs::PushConstantData {
-            color: material.pbr.color,
-            mettalic: material.pbr.mettalic,
-            roughness: material.pbr.roughness,
+            materialColor: material.pbr.color,
+            materialMettalic: material.pbr.mettalic,
+            materialRoughness: material.pbr.roughness,
             pointLightCount: lighting.point_ligths.len() as u32,
+            dirLightCount: lighting.dir_lights.len() as u32,
         };
         builder
             .bind_descriptor_sets(

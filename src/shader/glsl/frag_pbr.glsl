@@ -20,17 +20,23 @@ struct DirLight {
     vec3 color;
 };
 
-layout(std430, set = 0, binding = 2) readonly buffer LightBuffer
+layout(std430, set = 0, binding = 2) readonly buffer PointLightBuffer
 {
-    PointLight pointLights[];
-} lights;
+    PointLight lights[];
+} pointLights;
+
+layout(std430, set = 0, binding = 3) readonly buffer DirLightBuffer
+{
+    DirLight lights[];
+} dirLights;
 
 layout(push_constant) uniform PushConstantData {
-    vec4 color;
-    float mettalic;
-    float roughness;
+    vec4 materialColor;
+    float materialMettalic;
+    float materialRoughness;
     uint pointLightCount;
-} material;
+    uint dirLightCount;
+} params;
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0)
 {
@@ -67,27 +73,24 @@ float geometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
     return ggx1 * ggx2;
 }
 
-vec3 calcColor(vec3 N, vec3 V, vec3 lightPos, vec3 lightColor) {
-    vec3 L = normalize(lightPos - world_pos);
+vec3 calcColor(vec3 N, vec3 V, vec3 L, float attenuation, vec3 lightColor) {
     vec3 H = normalize(V + L);
-    float distance = length(lightPos - world_pos);
-    float attenuation = 1.0 / (distance * distance);
-    //vec3 radiance = lightColor * attenuation;
-    vec3 radiance = lightColor;
+    vec3 radiance = lightColor * attenuation;
+    //vec3 radiance = lightColor;
     vec3 F0 = vec3(0.12);
-    F0 = mix(F0, material.color.xyz, material.mettalic);
+    F0 = mix(F0, params.materialColor.xyz, params.materialMettalic);
     vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
-    float NDF = distributionGGX(N, H, material.roughness);
-    float G = geometrySmith(N, V, L, material.roughness);
+    float NDF = distributionGGX(N, H, params.materialRoughness);
+    float G = geometrySmith(N, V, L, params.materialRoughness);
     vec3 numerator = NDF * G * F;
     float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
     vec3 specular = numerator / denominator;
     vec3 kS = F;
     vec3 kD = vec3(1.0) - kS;
-    kD *= 1.0 - material.mettalic;
+    kD *= 1.0 - params.materialMettalic;
     float NdotL = max(dot(N, L), 0.0);
-    vec3 Lo = (kD * material.color.xyz / PI + specular) * radiance * NdotL;
-    vec3 ambient = vec3(0.03) * material.color.xyz;
+    vec3 Lo = (kD * params.materialColor.xyz / PI + specular) * radiance * NdotL;
+    vec3 ambient = vec3(0.03) * params.materialColor.xyz;
     vec3 color = ambient + Lo;
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2));
@@ -98,10 +101,20 @@ void main() {
     vec3 N = normalize(v_normal);
     vec3 V = normalize(camera.pos - world_pos);
     vec3 accColor = vec3(0.0, 0.0, 0.0);
-    for (int i = 0; i < material.pointLightCount; ++i) {
-        vec3 lightPos = lights.pointLights[i].pos.xyz;
-        vec3 lightColor = lights.pointLights[i].color.xyz;
-        accColor += calcColor(N, V, lightPos, lightColor);
+    for (int i = 0; i < params.pointLightCount; ++i) {
+        vec3 lightPos = pointLights.lights[i].pos.xyz;
+        vec3 lightColor = pointLights.lights[i].color.xyz;
+        vec3 L = normalize(lightPos - world_pos);
+        float distance = length(lightPos - world_pos);
+        float attenuation = 1.0 / (distance * distance);
+        accColor += 3*calcColor(N, V, L, attenuation, lightColor);
     }
-    f_color = vec4(accColor*3, 1.0);
+    for (int i = 0; i < params.dirLightCount; ++i) {
+        vec3 lightDir = dirLights.lights[i].dir.xyz;
+        vec3 lightColor = dirLights.lights[i].color.xyz;
+        vec3 L = normalize(-lightDir);
+        float attenuation = 1.0;
+        accColor += calcColor(N, V, L, attenuation, lightColor);
+    }
+    f_color = vec4(accColor, 1.0);
 }

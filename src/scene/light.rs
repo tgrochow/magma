@@ -17,7 +17,7 @@ impl Lighting {
         }
     }
 
-    pub fn create_light_buffer(
+    pub fn create_point_light_buffer(
         &self,
         memory_allocator: Arc<StandardMemoryAllocator>,
     ) -> vulkano::buffer::Subbuffer<[PointLight]> {
@@ -34,7 +34,27 @@ impl Lighting {
             },
             self.point_ligths.iter().copied(),
         )
-        .expect("failed to create light buffer")
+        .expect("failed to create point light buffer")
+    }
+
+    pub fn create_dir_light_buffer(
+        &self,
+        memory_allocator: Arc<StandardMemoryAllocator>,
+    ) -> vulkano::buffer::Subbuffer<[DirLight]> {
+        Buffer::from_iter(
+            memory_allocator,
+            BufferCreateInfo {
+                usage: BufferUsage::STORAGE_BUFFER,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            self.dir_lights.iter().copied(),
+        )
+        .expect("failed to create dir light buffer")
     }
 }
 
@@ -45,7 +65,9 @@ pub struct PointLight {
     pub color: [f32; 4],
 }
 
+#[repr(C)]
+#[derive(BufferContents, Clone, Copy)]
 pub struct DirLight {
-    pub dir: [f32; 3],
-    pub color: [f32; 3],
+    pub dir: [f32; 4],
+    pub color: [f32; 4],
 }
