@@ -9,6 +9,5 @@ void main() {
     float brightness = dot(normalize(v_normal), normalize(LIGHT));
     vec3 dark_color = vec3(0.25, 0.25, 0.25);
     vec3 regular_color = vec3(0.7, 0.7, 0.7);
-
     f_color = vec4(mix(dark_color, regular_color, brightness), 1.0);
 }

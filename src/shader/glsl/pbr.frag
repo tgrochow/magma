@@ -16,8 +16,8 @@ struct PointLight {
 };
 
 struct DirLight {
-    vec3 dir;
-    vec3 color;
+    vec4 dir;
+    vec4 color;
 };
 
 layout(std430, set = 0, binding = 2) readonly buffer PointLightBuffer
@@ -107,11 +107,11 @@ void main() {
         vec3 L = normalize(lightPos - world_pos);
         float distance = length(lightPos - world_pos);
         float attenuation = 1.0 / (distance * distance);
-        accColor += 3*calcColor(N, V, L, attenuation, lightColor);
+        accColor += calcColor(N, V, L, attenuation, lightColor);
     }
     for (int i = 0; i < params.dirLightCount; ++i) {
         vec3 lightDir = dirLights.lights[i].dir.xyz;
-        vec3 lightColor = dirLights.lights[i].color.xyz;
+        vec3 lightColor =  dirLights.lights[i].color.w * dirLights.lights[i].color.xyz;
         vec3 L = normalize(-lightDir);
         float attenuation = 1.0;
         accColor += calcColor(N, V, L, attenuation, lightColor);
