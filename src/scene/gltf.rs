@@ -12,7 +12,6 @@ pub struct GLTF {
 
 #[derive(Clone, Deserialize)]
 pub struct Material {
-    pub name: String,
     #[serde(rename = "pbrMetallicRoughness")]
     pub pbr: PBR,
 }
@@ -29,7 +28,6 @@ pub struct PBR {
 
 #[derive(Deserialize)]
 pub struct Mesh {
-    pub name: String,
     pub primitives: Vec<Primitive>,
 }
 

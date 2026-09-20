@@ -16,12 +16,16 @@ mod engine;
 mod scene;
 mod shader;
 
+struct State {
+    window: Arc<Window>,
+    engine: engine::Engine,
+    scene: scene::Scene,
+    fps_updated: Instant,
+}
+
 struct App {
     instance: Arc<Instance>,
-    window: Option<Arc<Window>>,
-    engine: Option<engine::Engine>,
-    scene: Option<scene::Scene>,
-    fps_updated: Instant,
+    state: Option<State>,
 }
 
 impl App {
@@ -39,10 +43,7 @@ impl App {
         .expect("failed to create Vulkan instance");
         App {
             instance: instance,
-            window: None,
-            engine: None,
-            scene: None,
-            fps_updated: Instant::now(),
+            state: None,
         }
     }
 }
@@ -53,12 +54,7 @@ impl ApplicationHandler for App {
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
         let window_size = window.inner_size();
         let aspect_ratio = window_size.width as f32 / window_size.height as f32;
-        self.window = Some(window);
-        self.engine = Some(engine::Engine::new(
-            &self.instance,
-            self.window.as_ref().unwrap().clone(),
-            SampleCount::Sample4,
-        ));
+        let engine = engine::Engine::new(&self.instance, window.clone(), SampleCount::Sample4);
         let mut scene = scene::Scene::new(aspect_ratio);
         scene.lighting.point_ligths.push(scene::light::PointLight {
             pos: [2.0, 4.0, 0.0, 1.0],
@@ -68,8 +64,13 @@ impl ApplicationHandler for App {
             dir: [0.0, 0.0, -1.0, 1.0],
             color: [1.0, 1.0, 1.0, 2.0],
         });
-        scene.load_model(Path::new("./models/well.gltf"), "well".to_string());
-        self.scene = Some(scene);
+        scene.load_model(Path::new("./models/well.gltf"), "well01".to_string());
+        self.state = Some(State {
+            window,
+            engine,
+            scene,
+            fps_updated: Instant::now(),
+        });
     }
 
     fn window_event(
@@ -83,42 +84,40 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::Resized(_) => {
-                let window_size = self.window.as_ref().unwrap().inner_size();
+                let state = self.state.as_mut().unwrap();
+                let window_size = state.window.inner_size();
                 let aspect_ratio = window_size.width as f32 / window_size.height as f32;
-                self.engine.as_mut().unwrap().recreate_swapchain();
-                self.scene
-                    .as_mut()
-                    .unwrap()
-                    .camera
-                    .update_projection(aspect_ratio);
+                state.engine.recreate_swapchain();
+                state.scene.camera.update_projection(aspect_ratio);
             }
             WindowEvent::RedrawRequested => {
-                self.engine.as_mut().unwrap().draw(
-                    &self.scene.as_ref().unwrap(),
-                    self.window.as_mut().unwrap().inner_size(),
-                );
-                if self.fps_updated.elapsed().as_secs() >= 3 {
-                    let fps = self.engine.as_ref().unwrap().get_fps();
+                let state = self.state.as_mut().unwrap();
+                state.engine.draw(&state.scene, state.window.inner_size());
+                state
+                    .scene
+                    .models
+                    .get_mut("well01")
+                    .unwrap()
+                    .rotate(0.0, 0.015, 0.0);
+                if state.fps_updated.elapsed().as_secs() >= 3 {
+                    let fps = state.engine.get_fps();
                     if fps > 0 {
                         let title = format!("Magma v0.1.0 - FPS: {}", fps);
-                        self.window.as_mut().unwrap().set_title(&title);
-                        self.fps_updated = Instant::now();
+                        state.window.set_title(&title);
+                        state.fps_updated = Instant::now();
                     }
                 }
-                self.window.as_ref().unwrap().request_redraw();
+                state.window.request_redraw();
             }
             WindowEvent::KeyboardInput { event, .. } => {
+                let state = self.state.as_mut().unwrap();
                 if event.state == ElementState::Pressed {
                     match &event.logical_key {
                         Key::Named(NamedKey::Escape) => {
                             event_loop.exit();
                         }
-                        Key::Named(NamedKey::ArrowUp) => {
-                            self.scene.as_mut().unwrap().camera.move_forward()
-                        }
-                        Key::Named(NamedKey::ArrowDown) => {
-                            self.scene.as_mut().unwrap().camera.move_backwards()
-                        }
+                        Key::Named(NamedKey::ArrowUp) => state.scene.camera.move_forward(),
+                        Key::Named(NamedKey::ArrowDown) => state.scene.camera.move_backwards(),
                         _ => {}
                     }
                 }

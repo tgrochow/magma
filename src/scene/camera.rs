@@ -10,7 +10,7 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(aspect_ratio: f32) -> Self {
-        let pos = Vec3::new(0.0, 2.0, 5.0);
+        let pos = Vec3::new(0.0, 3.0, 6.0);
         let dir = Vec3::new(0.0, 0.0, -1.0);
         let up = Vec3::new(0.0, -1.0, 0.0);
         Self {
@@ -57,9 +57,14 @@ impl Camera {
 }
 
 fn get_view_matrix(pos: Vec3, dir: Vec3, up: Vec3) -> Mat4 {
-    Mat4::look_at_rh(pos, pos + dir, up)
+    glam::camera::rh::view::look_at_mat4(pos, pos + dir, up)
 }
 
 fn get_projection_matrix(aspect_ratio: f32) -> Mat4 {
-    Mat4::perspective_rh_gl(std::f32::consts::FRAC_PI_2, aspect_ratio, 0.01, 100.0)
+    glam::camera::rh::proj::opengl::perspective(
+        std::f32::consts::FRAC_PI_2,
+        aspect_ratio,
+        0.01,
+        100.0,
+    )
 }
