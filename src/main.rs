@@ -66,7 +66,7 @@ impl ApplicationHandler for App {
         });
         scene.lighting.dir_lights.push(scene::light::DirLight {
             dir: [0.0, 0.0, -1.0, 1.0],
-            color: [0.1, 0.1, 0.1, 1.0],
+            color: [1.0, 1.0, 1.0, 2.0],
         });
         scene.load_model(Path::new("./models/well.gltf"), "well".to_string());
         self.scene = Some(scene);
