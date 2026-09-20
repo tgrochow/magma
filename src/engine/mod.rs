@@ -186,7 +186,7 @@ impl Engine {
             CommandBufferUsage::OneTimeSubmit,
         )
         .unwrap();
-        // very important: call cleanup_finished before begin_render_pass
+        // important: call cleanup_finished before begin_render_pass
         self.previous_frame_end.as_mut().unwrap().cleanup_finished();
         builder
             .begin_render_pass(
@@ -202,7 +202,7 @@ impl Engine {
             .bind_pipeline_graphics(self.pipeline.clone())
             .unwrap();
         for (_key, model) in &scene.models {
-            self.draw_model(&mut builder, &model, &scene.camera);
+            self.draw_model(&mut builder, &model, &scene.camera, &scene.lighting);
         }
         builder.end_render_pass(Default::default()).unwrap();
         let command_buffer = builder.build().unwrap();
@@ -221,6 +221,7 @@ impl Engine {
         match future.map_err(Validated::unwrap) {
             Ok(future) => {
                 self.previous_frame_end = Some(future.boxed());
+                self.statistik.tick();
             }
             Err(VulkanError::OutOfDate) => {
                 self.recreate_swapchain = true;
@@ -231,7 +232,6 @@ impl Engine {
                 self.previous_frame_end = Some(sync::now(self.device.clone()).boxed());
             }
         }
-        self.statistik.tick();
     }
 
     fn draw_model(
@@ -239,6 +239,7 @@ impl Engine {
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         model: &scene::model::Model,
         camera: &scene::camera::Camera,
+        lighting: &scene::light::Lighting,
     ) {
         for primitive in &model.primitives {
             self.draw_primitive(
@@ -247,6 +248,7 @@ impl Engine {
                 &primitive,
                 camera,
                 &model.materials[primitive.material_index],
+                &lighting,
             );
         }
     }
@@ -258,6 +260,7 @@ impl Engine {
         primitive: &scene::model::Primitive,
         camera: &scene::camera::Camera,
         material: &scene::gltf::Material,
+        lighting: &scene::light::Lighting,
     ) {
         let pos_buffer = primitive.create_vertex_buffer(&self.memory_allocator);
         let normals_buffer = primitive.create_normals_buffer(&self.memory_allocator);
@@ -282,6 +285,7 @@ impl Engine {
             *buffer.write().unwrap() = uniform_data;
             buffer
         };
+        let lights_buffer = lighting.create_light_buffer(self.memory_allocator.clone());
         let layout = &self.pipeline.layout().set_layouts()[0];
         let descriptor_set = DescriptorSet::new(
             self.descriptor_set_allocator.clone(),
@@ -289,6 +293,7 @@ impl Engine {
             [
                 WriteDescriptorSet::buffer(0, vs_uniform_buffer),
                 WriteDescriptorSet::buffer(1, fs_uniform_buffer),
+                WriteDescriptorSet::buffer(2, lights_buffer),
             ],
             [],
         )
@@ -297,6 +302,7 @@ impl Engine {
             color: material.pbr.color,
             mettalic: material.pbr.mettalic,
             roughness: material.pbr.roughness,
+            pointLightCount: lighting.point_ligths.len() as u32,
         };
         builder
             .bind_descriptor_sets(

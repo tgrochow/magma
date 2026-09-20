@@ -60,6 +60,10 @@ impl ApplicationHandler for App {
             SampleCount::Sample4,
         ));
         let mut scene = scene::Scene::new(aspect_ratio);
+        scene.lighting.point_ligths.push(scene::light::PointLight {
+            pos: [2.0, 4.0, 0.0, 1.0],
+            color: [1.0, 1.0, 1.0, 1.0],
+        });
         scene.load_model(Path::new("./models/well.gltf"), "well".to_string());
         self.scene = Some(scene);
     }

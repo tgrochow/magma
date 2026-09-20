@@ -5,11 +5,13 @@ use std::path::Path;
 
 pub mod camera;
 pub mod gltf;
+pub mod light;
 pub mod model;
 
 pub struct Scene {
     pub models: HashMap<String, model::Model>,
     pub camera: camera::Camera,
+    pub lighting: light::Lighting,
 }
 
 impl Scene {
@@ -17,6 +19,7 @@ impl Scene {
         Scene {
             models: HashMap::new(),
             camera: camera::Camera::new(aspect_ratio),
+            lighting: light::Lighting::new(),
         }
     }
 
