@@ -17,6 +17,12 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
+      - name: Inspect C++ headers
+        run: |
+          nix develop --command bash -c \
+          'echo "#include <unordered_map>" | g++ -H -x c++ -std=c++11 -c -o /dev/null - 2>&1'
+
+
       - name: Show C++ include paths
         run: |
           nix develop --command g++ -E -v -x c++ - </dev/null 2>&1 \
