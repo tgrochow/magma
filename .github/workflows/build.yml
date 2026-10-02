@@ -17,5 +17,22 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
+      - name: Show Nix environment
+        run: |
+          nix flake metadata
+          nix develop --command bash -c '
+            echo "gcc:"
+            g++ --version | head -1
+
+            echo "rust:"
+            rustc --version
+
+            echo "cmake:"
+            cmake --version | head -1
+
+            echo "nixpkgs:"
+            nix flake metadata --json | jq -r ".locks.nodes.nixpkgs.locked | \"\\(.rev) \\(.narHash)\""
+          '
+
       - name: Build
         run: nix develop --command cargo build
