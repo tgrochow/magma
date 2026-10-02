@@ -46,4 +46,4 @@ jobs:
           '
 
       - name: Build
-        run: nix develop --command cargo build
+        run: nix develop --command cargo build -vv
