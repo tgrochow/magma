@@ -33,6 +33,9 @@
             vulkan-loader
             vulkan-validation-layers
 
+            shaderc
+            glslang
+
             wayland
             libxkbcommon
             xkeyboard-config
