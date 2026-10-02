@@ -1,0 +1,49 @@
+name: Build
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Inspect C++ headers
+        run: |
+          nix develop --command bash -c \
+          'echo "#include <unordered_map>" | g++ -H -x c++ -std=c++11 -c -o /dev/null - 2>&1'
+
+
+      - name: Show C++ include paths
+        run: |
+          nix develop --command g++ -E -v -x c++ - </dev/null 2>&1 \
+            | sed -n '/search starts here:/,/End of search list./p'
+
+      - name: Show Nix environment
+        run: |
+          nix flake metadata
+          nix develop --command bash -c '
+            echo "gcc:"
+            g++ --version | head -1
+
+            echo "rust:"
+            rustc --version
+
+            echo "cmake:"
+            cmake --version | head -1
+
+            echo "nixpkgs:"
+            nix flake metadata --json | jq -r ".locks.nodes.nixpkgs.locked | \"\\(.rev) \\(.narHash)\""
+          '
+
+      - name: Build
+        run: nix develop --command cargo build -vv
