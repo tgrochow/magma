@@ -25,16 +25,10 @@
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             cargo
-            rustc
             cmake
             pkg-config
 
-            vulkan-loader
             vulkan-headers
-            vulkan-validation-layers
-
-            shaderc
-            glslang
 
             wayland
             libxkbcommon
