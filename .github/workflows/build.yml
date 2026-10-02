@@ -16,7 +16,11 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
-
+      - name: Show C++ include paths
+        run: |
+          nix develop --command bash -c \
+            'echo | g++ -E -v -x c++ - 2>&1' \
+            2>&1 | sed -n '/search starts here:/,/End of search list.
       - name: Show Nix environment
         run: |
           nix flake metadata
