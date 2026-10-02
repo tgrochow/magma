@@ -30,6 +30,11 @@
             pkg-config
 
             vulkan-headers
+            vulkan-loader
+            vulkan-validation-layers
+
+            shaderc
+            glslang
 
             wayland
             libxkbcommon
