@@ -4,15 +4,22 @@
 
 ### Dependencies
 
+- [Vulkano](https://github.com/vulkano-rs/vulkano#linux-specific-setup)
 - [CMake](https://cmake.org/)
 - [Ninja](https://ninja-build.org/)
 
-```bash
+```sh
 pacman -Sy base-devel git python cmake vulkan-devel --noconfirm
 ```
 
-- Vulkan driver
+- [Vulkan driver](https://wiki.archlinux.org/title/Vulkan)
 
-```bash
-pacman -S vulkan-intel
+```sh
+pacman -S vulkan-radeon vulkan-intel vulkan-nouveau 
+```
+
+### Run
+
+```sh
+cargo run
 ```
