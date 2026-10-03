@@ -39,6 +39,9 @@
           ];
 
           CMAKE_POLICY_VERSION_MINIMUM = "3.5";
+          # shaderc-sys 0.8.3 uses uint32_t without including <cstdint> but we
+          # need that on Ubuntu and we need Ubuntu because that's the only distro
+          # available on GitHub Actions. This is not needed on NixOS.
           CXXFLAGS = "-include cstdint";
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
             pkgs.vulkan-loader
