@@ -39,7 +39,7 @@
           ];
 
           CMAKE_POLICY_VERSION_MINIMUM = "3.5";
-
+          CXXFLAGS = "-include cstdint";
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
             pkgs.vulkan-loader
             pkgs.wayland
