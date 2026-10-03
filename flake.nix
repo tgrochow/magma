@@ -25,7 +25,6 @@
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             cargo
-            rustc
             cmake
             pkg-config
 
