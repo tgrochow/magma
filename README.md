@@ -2,6 +2,12 @@
 
 ## Build
 
+### Nix Flake
+
+The `flake.nix` provides a development environment. You can either activate it
+manually with `nix develop` or automatically with `direnv` after running `direnv
+allow`.
+
 ### Dependencies
 
 - [Vulkano](https://github.com/vulkano-rs/vulkano#linux-specific-setup)
