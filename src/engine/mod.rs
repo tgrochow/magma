@@ -301,9 +301,9 @@ impl Engine {
         )
         .unwrap();
         let push_constants = shader::pbr_fs::PushConstantData {
-            materialColor: material.pbr.color,
-            materialMettalic: material.pbr.mettalic,
-            materialRoughness: material.pbr.roughness,
+            materialColor: material.pbr.color.unwrap_or([0.0, 0.0, 0.0, 1.0]),
+            materialMettalic: material.pbr.mettalic.unwrap_or(0.0),
+            materialRoughness: material.pbr.roughness.unwrap_or(0.0),
             pointLightCount: lighting.point_ligths.len() as u32,
             dirLightCount: lighting.dir_lights.len() as u32,
         };

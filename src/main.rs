@@ -64,7 +64,8 @@ impl ApplicationHandler for App {
             dir: [0.0, 0.0, -1.0, 1.0],
             color: [1.0, 1.0, 1.0, 2.0],
         });
-        scene.load_model(Path::new("./models/well.gltf"), "well01".to_string());
+        scene.load_model(Path::new("./models/well/well.gltf"), "well01".to_string());
+        scene.load_model(Path::new("./models/fox/fox.gltf"), "fox01".to_string());
         self.state = Some(State {
             window,
             engine,

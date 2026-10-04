@@ -35,10 +35,26 @@ impl Normal {
     }
 }
 
+#[derive(BufferContents, Vertex, Clone)]
+#[repr(C)]
+pub struct TextureCoords {
+    #[format(R32G32B32_SFLOAT)]
+    pub texture_coords: [f32; 2],
+}
+
+impl TextureCoords {
+    pub fn new(u: f32, w: f32) -> Self {
+        TextureCoords {
+            texture_coords: [u, w],
+        }
+    }
+}
+
 pub struct Primitive {
     pub positions: Vec<Position>,
     pub normals: Vec<Normal>,
     pub indices: Vec<u16>,
+    pub tex_coords: Vec<TextureCoords>,
     pub material_index: usize,
 }
 
@@ -79,6 +95,26 @@ impl Primitive {
                 ..Default::default()
             },
             self.normals.clone(),
+        )
+        .unwrap()
+    }
+
+    pub fn create_texture_coordinates_buffer(
+        &self,
+        memory_allocator: &Arc<StandardMemoryAllocator>,
+    ) -> Subbuffer<[TextureCoords]> {
+        Buffer::from_iter(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::VERTEX_BUFFER,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            self.tex_coords.clone(),
         )
         .unwrap()
     }

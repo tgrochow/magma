@@ -19,11 +19,19 @@ pub struct Material {
 #[derive(Clone, Deserialize)]
 pub struct PBR {
     #[serde(rename = "baseColorFactor")]
-    pub color: [f32; 4],
+    pub color: Option<[f32; 4]>,
+    #[serde(rename = "baseColorTexture")]
+    pub color_texture_index: Option<PBRTexture>,
     #[serde(rename = "metallicFactor")]
-    pub mettalic: f32,
+    pub mettalic: Option<f32>,
     #[serde(rename = "roughnessFactor")]
-    pub roughness: f32,
+    pub roughness: Option<f32>,
+}
+
+#[derive(Clone, Deserialize)]
+pub struct PBRTexture {
+    #[serde(rename = "index")]
+    pub texture_index: usize,
 }
 
 #[derive(Deserialize)]

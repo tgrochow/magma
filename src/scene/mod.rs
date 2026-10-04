@@ -34,10 +34,12 @@ impl Scene {
             for p in &mesh.primitives {
                 let positions = load_positions(model_dir, &p, &data);
                 let normals = load_normals(model_dir, &p, &data);
+                let texture_coords = load_tex_coords(model_dir, &p, &data);
                 let indices = load_indices(model_dir, &p, &data);
                 let primitive = model::Primitive {
                     positions: positions,
                     normals: normals,
+                    tex_coords: texture_coords,
                     indices: indices,
                     material_index: p.material_index,
                 };
@@ -80,18 +82,18 @@ fn load_normals(
     primitive: &gltf::Primitive,
     data: &gltf::GLTF,
 ) -> Vec<model::Normal> {
-    let pos_acc_index = primitive.attributes.normals_accessor_index;
-    let pos_acc = &data.accessors[pos_acc_index];
-    let pos_buffer_view = &data.buffer_views[pos_acc.buffer_view_index];
-    let pos_buffer = &data.buffers[pos_buffer_view.buffer_index];
-    let buffer_path = model_dir.join(&pos_buffer.uri);
+    let normals_acc_index = primitive.attributes.normals_accessor_index;
+    let normals_acc = &data.accessors[normals_acc_index];
+    let normals_buffer_view = &data.buffer_views[normals_acc.buffer_view_index];
+    let normals_buffer = &data.buffers[normals_buffer_view.buffer_index];
+    let buffer_path = model_dir.join(&normals_buffer.uri);
     let mut buffer_file = File::open(buffer_path).expect("engine: couldn't open mesh data file");
-    _ = buffer_file.seek(SeekFrom::Start(pos_buffer_view.byte_offset));
-    let mut byte_buffer = vec![0u8; pos_buffer_view.byte_length];
+    _ = buffer_file.seek(SeekFrom::Start(normals_buffer_view.byte_offset));
+    let mut byte_buffer = vec![0u8; normals_buffer_view.byte_length];
     buffer_file
         .read_exact(&mut byte_buffer)
         .expect("engine: couldn't read mesh data file");
-    let mut normals: Vec<model::Normal> = Vec::with_capacity(pos_acc.data_struct_count);
+    let mut normals: Vec<model::Normal> = Vec::with_capacity(normals_acc.data_struct_count);
     for chunk in byte_buffer.chunks_exact(12) {
         let x = f32::from_le_bytes(chunk[0..4].try_into().unwrap());
         let y = f32::from_le_bytes(chunk[4..8].try_into().unwrap());
@@ -99,6 +101,31 @@ fn load_normals(
         normals.push(model::Normal::new(x, y, z));
     }
     normals
+}
+
+fn load_tex_coords(
+    model_dir: &Path,
+    primitive: &gltf::Primitive,
+    data: &gltf::GLTF,
+) -> Vec<model::TextureCoords> {
+    let coords_acc_index = primitive.attributes.texcoords_accessor_index;
+    let coords_acc = &data.accessors[coords_acc_index];
+    let coords_buffer_view = &data.buffer_views[coords_acc.buffer_view_index];
+    let coords_buffer = &data.buffers[coords_buffer_view.buffer_index];
+    let buffer_path = model_dir.join(&coords_buffer.uri);
+    let mut buffer_file = File::open(buffer_path).expect("engine: couldn't open mesh data file");
+    _ = buffer_file.seek(SeekFrom::Start(coords_buffer_view.byte_offset));
+    let mut byte_buffer = vec![0u8; coords_buffer_view.byte_length];
+    buffer_file
+        .read_exact(&mut byte_buffer)
+        .expect("engine: couldn't read mesh data file");
+    let mut coords: Vec<model::TextureCoords> = Vec::with_capacity(coords_acc.data_struct_count);
+    for chunk in byte_buffer.chunks_exact(8) {
+        let u = f32::from_le_bytes(chunk[0..4].try_into().unwrap());
+        let w = f32::from_le_bytes(chunk[4..8].try_into().unwrap());
+        coords.push(model::TextureCoords::new(u, w));
+    }
+    coords
 }
 
 fn load_indices(model_dir: &Path, primitive: &gltf::Primitive, data: &gltf::GLTF) -> Vec<u16> {
