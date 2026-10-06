@@ -9,9 +9,8 @@ use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
 use vulkano::descriptor_set::{DescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, Queue};
 use vulkano::format::{ClearValue, Format};
-use vulkano::image::SampleCount;
 use vulkano::image::view::ImageView;
-use vulkano::image::{Image, ImageCreateInfo, ImageType, ImageUsage};
+use vulkano::image::{Image, ImageCreateInfo, ImageType, ImageUsage, SampleCount};
 use vulkano::instance::Instance;
 use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator};
 use vulkano::pipeline::graphics::GraphicsPipelineCreateInfo;
@@ -259,11 +258,13 @@ impl Engine {
         model: &scene::model::Model,
         primitive: &scene::model::Primitive,
         camera: &scene::camera::Camera,
-        material: &scene::gltf::Material,
+        material: &scene::material::Material,
         lighting: &scene::light::Lighting,
     ) {
         let pos_buffer = primitive.create_vertex_buffer(&self.memory_allocator);
         let normals_buffer = primitive.create_normals_buffer(&self.memory_allocator);
+        let texture_coords_buffer =
+            primitive.create_texture_coordinates_buffer(&self.memory_allocator);
         let index_buffer = primitive.create_index_buffer(&self.memory_allocator);
         let index_buffer_length = index_buffer.len() as u32;
         let vs_uniform_buffer = {
@@ -287,6 +288,11 @@ impl Engine {
         };
         let point_lights_buffer = lighting.create_point_light_buffer(self.memory_allocator.clone());
         let dir_lights_buffer = lighting.create_dir_light_buffer(self.memory_allocator.clone());
+        let (texture_view, sampler) = model.textures[0].create_texture_buffer(
+            builder,
+            self.memory_allocator.clone(),
+            self.device.clone(),
+        );
         let layout = &self.pipeline.layout().set_layouts()[0];
         let descriptor_set = DescriptorSet::new(
             self.descriptor_set_allocator.clone(),
@@ -296,14 +302,15 @@ impl Engine {
                 WriteDescriptorSet::buffer(1, fs_uniform_buffer),
                 WriteDescriptorSet::buffer(2, point_lights_buffer),
                 WriteDescriptorSet::buffer(3, dir_lights_buffer),
+                WriteDescriptorSet::image_view_sampler(4, texture_view, sampler),
             ],
             [],
         )
         .unwrap();
         let push_constants = shader::pbr_fs::PushConstantData {
-            materialColor: material.pbr.color.unwrap_or([0.0, 0.0, 0.0, 1.0]),
-            materialMettalic: material.pbr.mettalic.unwrap_or(0.0),
-            materialRoughness: material.pbr.roughness.unwrap_or(0.0),
+            materialColor: material.color,
+            materialMettalic: material.mettalic,
+            materialRoughness: material.roughness,
             pointLightCount: lighting.point_ligths.len() as u32,
             dirLightCount: lighting.dir_lights.len() as u32,
         };
@@ -315,7 +322,7 @@ impl Engine {
                 descriptor_set,
             )
             .unwrap()
-            .bind_vertex_buffers(0, (pos_buffer, normals_buffer))
+            .bind_vertex_buffers(0, (pos_buffer, normals_buffer, texture_coords_buffer))
             .unwrap()
             .bind_index_buffer(index_buffer)
             .unwrap()
@@ -468,6 +475,7 @@ fn create_pipeline(
     let vertex_input_state = [
         scene::model::Position::per_vertex(),
         scene::model::Normal::per_vertex(),
+        scene::model::TextureCoords::per_vertex(),
     ]
     .definition(&vs)
     .unwrap();

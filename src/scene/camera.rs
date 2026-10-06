@@ -9,8 +9,21 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn new(aspect_ratio: f32) -> Self {
+    pub fn new_default(aspect_ratio: f32) -> Self {
         let pos = Vec3::new(0.0, 3.0, 6.0);
+        let dir = Vec3::new(0.0, 0.0, -1.0);
+        let up = Vec3::new(0.0, -1.0, 0.0);
+        Self {
+            pos: pos,
+            dir: dir,
+            up: up,
+            proj: get_projection_matrix(aspect_ratio),
+            view: get_view_matrix(pos, dir, up),
+        }
+    }
+
+    pub fn new(aspect_ratio: f32, pos: Vec3) -> Self {
+        let pos = pos;
         let dir = Vec3::new(0.0, 0.0, -1.0);
         let up = Vec3::new(0.0, -1.0, 0.0);
         Self {

@@ -1,3 +1,4 @@
+use glam::Vec3;
 use std::error::Error;
 use std::path::Path;
 use std::sync::Arc;
@@ -55,7 +56,7 @@ impl ApplicationHandler for App {
         let window_size = window.inner_size();
         let aspect_ratio = window_size.width as f32 / window_size.height as f32;
         let engine = engine::Engine::new(&self.instance, window.clone(), SampleCount::Sample4);
-        let mut scene = scene::Scene::new(aspect_ratio);
+        let mut scene = scene::Scene::new(aspect_ratio, Vec3::new(0.0, 3.0, 12.0));
         scene.lighting.point_ligths.push(scene::light::PointLight {
             pos: [2.0, 4.0, 0.0, 1.0],
             color: [1.0, 1.0, 1.0, 1.0],
@@ -64,7 +65,6 @@ impl ApplicationHandler for App {
             dir: [0.0, 0.0, -1.0, 1.0],
             color: [1.0, 1.0, 1.0, 2.0],
         });
-        scene.load_model(Path::new("./models/well/well.gltf"), "well01".to_string());
         scene.load_model(Path::new("./models/fox/fox.gltf"), "fox01".to_string());
         self.state = Some(State {
             window,
@@ -97,7 +97,7 @@ impl ApplicationHandler for App {
                 state
                     .scene
                     .models
-                    .get_mut("well01")
+                    .get_mut("fox01")
                     .unwrap()
                     .rotate(0.0, 0.015, 0.0);
                 if state.fps_updated.elapsed().as_secs() >= 3 {

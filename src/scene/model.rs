@@ -1,11 +1,11 @@
+use crate::scene::material;
+use crate::scene::texture;
 use glam::{Mat4, Vec3};
 use std::f32::consts::TAU;
 use std::sync::Arc;
 use vulkano::buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer};
 use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator};
 use vulkano::pipeline::graphics::vertex_input::Vertex;
-
-use crate::scene::gltf::Material;
 
 #[derive(BufferContents, Vertex, Clone)]
 #[repr(C)]
@@ -38,7 +38,7 @@ impl Normal {
 #[derive(BufferContents, Vertex, Clone)]
 #[repr(C)]
 pub struct TextureCoords {
-    #[format(R32G32B32_SFLOAT)]
+    #[format(R32G32_SFLOAT)]
     pub texture_coords: [f32; 2],
 }
 
@@ -142,7 +142,8 @@ impl Primitive {
 
 pub struct Model {
     pub primitives: Vec<Primitive>,
-    pub materials: Vec<Material>,
+    pub materials: Vec<material::Material>,
+    pub textures: Vec<texture::Texture>,
     translation: Vec3,
     rotation_x: f32,
     rotation_y: f32,
@@ -150,10 +151,15 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(primitives: Vec<Primitive>, materials: Vec<Material>) -> Self {
+    pub fn new(
+        primitives: Vec<Primitive>,
+        materials: Vec<material::Material>,
+        textures: Vec<texture::Texture>,
+    ) -> Self {
         Model {
             primitives: primitives,
             materials: materials,
+            textures: textures,
             translation: Vec3 {
                 x: 0.0,
                 y: 0.0,

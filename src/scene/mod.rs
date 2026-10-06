@@ -1,12 +1,16 @@
+use glam::Vec3;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
+use std::vec;
 
 pub mod camera;
 pub mod gltf;
 pub mod light;
+pub mod material;
 pub mod model;
+pub mod texture;
 
 pub struct Scene {
     pub models: HashMap<String, model::Model>,
@@ -15,10 +19,10 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn new(aspect_ratio: f32) -> Self {
+    pub fn new(aspect_ratio: f32, camera_pos: Vec3) -> Self {
         Scene {
             models: HashMap::new(),
-            camera: camera::Camera::new(aspect_ratio),
+            camera: camera::Camera::new(aspect_ratio, camera_pos),
             lighting: light::Lighting::new(),
         }
     }
@@ -29,6 +33,15 @@ impl Scene {
         let data: gltf::GLTF =
             serde_json::from_reader(reader).expect("engine: couldn't parse file");
         let model_dir = path.parent().unwrap();
+        let mut materials: Vec<material::Material> = Vec::new();
+        for gltf_material in &data.materials {
+            materials.push(material::Material::new(gltf_material));
+        }
+        let mut textures: Vec<texture::Texture> = Vec::new();
+        for gltf_texture in &data.textures {
+            let uri = data.images[gltf_texture.source_id].uri.clone();
+            textures.push(texture::Texture::new(path, uri));
+        }
         for mesh in &data.meshes {
             let mut primitives = Vec::new();
             for p in &mesh.primitives {
@@ -45,7 +58,7 @@ impl Scene {
                 };
                 primitives.push(primitive);
             }
-            let model = model::Model::new(primitives, data.materials.clone());
+            let model = model::Model::new(primitives, materials.clone(), textures.clone());
             self.models.insert(name.clone(), model);
         }
     }

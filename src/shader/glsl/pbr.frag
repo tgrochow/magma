@@ -4,6 +4,8 @@ const float PI = 3.14159265359;
 
 layout(location = 0) in vec3 world_pos;
 layout(location = 1) in vec3 v_normal;
+layout(location = 2) in vec3 v_texture_coords;
+
 layout(location = 0) out vec4 f_color;
 
 layout(set = 0, binding = 1) uniform CameraData {
@@ -29,6 +31,8 @@ layout(std430, set = 0, binding = 3) readonly buffer DirLightBuffer
 {
     DirLight lights[];
 } dirLights;
+
+layout(set = 0, binding = 4) uniform sampler2D pbr_base_color_texture;
 
 layout(push_constant) uniform PushConstantData {
     vec4 materialColor;

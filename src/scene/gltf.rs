@@ -4,9 +4,12 @@ use serde::Deserialize;
 pub struct GLTF {
     pub materials: Vec<Material>,
     pub meshes: Vec<Mesh>,
+    pub textures: Vec<Texture>,
+    pub images: Vec<Image>,
     pub accessors: Vec<Accessor>,
     #[serde(rename = "bufferViews")]
     pub buffer_views: Vec<BufferView>,
+    pub samplers: Vec<Sampler>,
     pub buffers: Vec<Buffer>,
 }
 
@@ -21,14 +24,14 @@ pub struct PBR {
     #[serde(rename = "baseColorFactor")]
     pub color: Option<[f32; 4]>,
     #[serde(rename = "baseColorTexture")]
-    pub color_texture_index: Option<PBRTexture>,
+    pub color_texture: Option<PBRTexture>,
     #[serde(rename = "metallicFactor")]
     pub mettalic: Option<f32>,
     #[serde(rename = "roughnessFactor")]
     pub roughness: Option<f32>,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Copy, Deserialize)]
 pub struct PBRTexture {
     #[serde(rename = "index")]
     pub texture_index: usize,
@@ -59,6 +62,22 @@ pub struct Attributes {
 }
 
 #[derive(Deserialize)]
+pub struct Texture {
+    #[serde(rename = "sampler")]
+    pub sampler_id: usize,
+    #[serde(rename = "source")]
+    pub source_id: usize,
+}
+
+#[derive(Deserialize)]
+pub struct Image {
+    #[serde(rename = "mimeType")]
+    pub mime_type: String,
+    #[serde(rename = "uri")]
+    pub uri: String,
+}
+
+#[derive(Deserialize)]
 pub struct Accessor {
     #[serde(rename = "bufferView")]
     pub buffer_view_index: usize,
@@ -78,6 +97,14 @@ pub struct BufferView {
     pub byte_length: usize,
     #[serde(rename = "byteOffset")]
     pub byte_offset: u64,
+}
+
+#[derive(Deserialize)]
+pub struct Sampler {
+    #[serde(rename = "magFilter")]
+    pub mag_filter: usize,
+    #[serde(rename = "minFilter")]
+    pub min_filter: usize,
 }
 
 #[derive(Deserialize)]
