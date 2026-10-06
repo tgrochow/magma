@@ -55,7 +55,7 @@ impl ApplicationHandler for App {
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
         let window_size = window.inner_size();
         let aspect_ratio = window_size.width as f32 / window_size.height as f32;
-        let engine = engine::Engine::new(&self.instance, window.clone(), SampleCount::Sample4);
+        let mut engine = engine::Engine::new(&self.instance, window.clone(), SampleCount::Sample4);
         let mut scene = scene::Scene::new(aspect_ratio, Vec3::new(0.0, 3.0, 12.0));
         scene.lighting.point_ligths.push(scene::light::PointLight {
             pos: [2.0, 4.0, 0.0, 1.0],
@@ -66,6 +66,7 @@ impl ApplicationHandler for App {
             color: [1.0, 1.0, 1.0, 2.0],
         });
         scene.load_model(Path::new("./models/fox/fox.gltf"), "fox01".to_string());
+        engine.prepare_scene(&mut scene);
         self.state = Some(State {
             window,
             engine,
@@ -93,7 +94,9 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 let state = self.state.as_mut().unwrap();
-                state.engine.draw(&state.scene, state.window.inner_size());
+                state
+                    .engine
+                    .draw(&mut state.scene, state.window.inner_size());
                 state
                     .scene
                     .models

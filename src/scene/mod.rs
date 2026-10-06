@@ -16,6 +16,7 @@ pub struct Scene {
     pub models: HashMap<String, model::Model>,
     pub camera: camera::Camera,
     pub lighting: light::Lighting,
+    pub textures: Vec<texture::Texture>,
 }
 
 impl Scene {
@@ -24,6 +25,7 @@ impl Scene {
             models: HashMap::new(),
             camera: camera::Camera::new(aspect_ratio, camera_pos),
             lighting: light::Lighting::new(),
+            textures: Vec::new(),
         }
     }
 
@@ -37,10 +39,9 @@ impl Scene {
         for gltf_material in &data.materials {
             materials.push(material::Material::new(gltf_material));
         }
-        let mut textures: Vec<texture::Texture> = Vec::new();
         for gltf_texture in &data.textures {
             let uri = data.images[gltf_texture.source_id].uri.clone();
-            textures.push(texture::Texture::new(path, uri));
+            self.textures.push(texture::Texture::new(path, uri));
         }
         for mesh in &data.meshes {
             let mut primitives = Vec::new();
@@ -58,7 +59,7 @@ impl Scene {
                 };
                 primitives.push(primitive);
             }
-            let model = model::Model::new(primitives, materials.clone(), textures.clone());
+            let model = model::Model::new(primitives, materials.clone());
             self.models.insert(name.clone(), model);
         }
     }

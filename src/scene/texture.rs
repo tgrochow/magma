@@ -17,6 +17,8 @@ pub struct Texture {
     pub width: u32,
     pub height: u32,
     pub pixels: Vec<u8>,
+    pub image_view: Option<Arc<ImageView>>,
+    pub sampler: Option<Arc<Sampler>>,
 }
 
 impl Texture {
@@ -25,7 +27,7 @@ impl Texture {
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."))
             .join(uri);
-        let rgba = image::open(&texture_path).unwrap().to_rgb8();
+        let rgba = image::open(&texture_path).unwrap().to_rgba8();
         let (width, height) = rgba.dimensions();
         let pixels = rgba.into_raw();
         Texture {
@@ -33,15 +35,17 @@ impl Texture {
             width: width,
             height: height,
             pixels: pixels,
+            image_view: None,
+            sampler: None,
         }
     }
 
-    pub fn create_texture_buffer(
-        &self,
+    pub fn load_texture(
+        &mut self,
         builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         memory_allocator: Arc<StandardMemoryAllocator>,
         device: Arc<Device>,
-    ) -> (Arc<ImageView>, Arc<Sampler>) {
+    ) {
         let texture_buffer = Buffer::from_iter(
             memory_allocator.clone(),
             BufferCreateInfo {
@@ -62,11 +66,11 @@ impl Texture {
                 image_type: ImageType::Dim2d,
                 format: Format::R8G8B8A8_SRGB,
                 extent: [self.width, self.height, 1],
-                usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED, // Transfer-Ziel + Shader-Zugriff
+                usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
                 ..Default::default()
             },
             AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE, // Schneller GPU-Speicher
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
                 ..Default::default()
             },
         )
@@ -77,12 +81,13 @@ impl Texture {
                 image.clone(),
             ))
             .unwrap();
-        let texture_view = ImageView::new_default(image).unwrap();
-        let sampler = Sampler::new(
-            device.clone(),
-            SamplerCreateInfo::simple_repeat_linear_no_mipmap(),
-        )
-        .unwrap();
-        (texture_view, sampler)
+        self.image_view = Some(ImageView::new_default(image).unwrap());
+        self.sampler = Some(
+            Sampler::new(
+                device.clone(),
+                SamplerCreateInfo::simple_repeat_linear_no_mipmap(),
+            )
+            .unwrap(),
+        );
     }
 }

@@ -4,7 +4,7 @@ const float PI = 3.14159265359;
 
 layout(location = 0) in vec3 world_pos;
 layout(location = 1) in vec3 v_normal;
-layout(location = 2) in vec3 v_texture_coords;
+layout(location = 2) in vec2 v_texture_coords;
 
 layout(location = 0) out vec4 f_color;
 
@@ -77,12 +77,11 @@ float geometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
     return ggx1 * ggx2;
 }
 
-vec3 calcColor(vec3 N, vec3 V, vec3 L, float attenuation, vec3 lightColor) {
+vec3 calcColor(vec3 base_color, vec3 N, vec3 V, vec3 L, float attenuation, vec3 lightColor) {
     vec3 H = normalize(V + L);
     vec3 radiance = lightColor * attenuation;
-    //vec3 radiance = lightColor;
     vec3 F0 = vec3(0.12);
-    F0 = mix(F0, params.materialColor.xyz, params.materialMettalic);
+    F0 = mix(F0, base_color.rgb, params.materialMettalic);
     vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
     float NDF = distributionGGX(N, H, params.materialRoughness);
     float G = geometrySmith(N, V, L, params.materialRoughness);
@@ -93,8 +92,8 @@ vec3 calcColor(vec3 N, vec3 V, vec3 L, float attenuation, vec3 lightColor) {
     vec3 kD = vec3(1.0) - kS;
     kD *= 1.0 - params.materialMettalic;
     float NdotL = max(dot(N, L), 0.0);
-    vec3 Lo = (kD * params.materialColor.xyz / PI + specular) * radiance * NdotL;
-    vec3 ambient = vec3(0.03) * params.materialColor.xyz;
+    vec3 Lo = (kD * base_color / PI + specular) * radiance * NdotL;
+    vec3 ambient = vec3(0.03) * base_color;
     vec3 color = ambient + Lo;
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2));
@@ -102,6 +101,8 @@ vec3 calcColor(vec3 N, vec3 V, vec3 L, float attenuation, vec3 lightColor) {
 }
 
 void main() {
+    // vec4 base_color = params.materialColor
+    vec4 base_color = texture(pbr_base_color_texture, v_texture_coords);
     vec3 N = normalize(v_normal);
     vec3 V = normalize(camera.pos - world_pos);
     vec3 accColor = vec3(0.0, 0.0, 0.0);
@@ -111,14 +112,14 @@ void main() {
         vec3 L = normalize(lightPos - world_pos);
         float distance = length(lightPos - world_pos);
         float attenuation = 1.0 / (distance * distance);
-        accColor += calcColor(N, V, L, attenuation, lightColor);
+        accColor += calcColor(base_color.rgb, N, V, L, attenuation, lightColor);
     }
     for (int i = 0; i < params.dirLightCount; ++i) {
         vec3 lightDir = dirLights.lights[i].dir.xyz;
         vec3 lightColor =  dirLights.lights[i].color.w * dirLights.lights[i].color.xyz;
         vec3 L = normalize(-lightDir);
         float attenuation = 1.0;
-        accColor += calcColor(N, V, L, attenuation, lightColor);
+        accColor += calcColor(base_color.rgb, N, V, L, attenuation, lightColor);
     }
     f_color = vec4(accColor, 1.0);
 }

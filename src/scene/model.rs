@@ -1,5 +1,4 @@
 use crate::scene::material;
-use crate::scene::texture;
 use glam::{Mat4, Vec3};
 use std::f32::consts::TAU;
 use std::sync::Arc;
@@ -143,7 +142,6 @@ impl Primitive {
 pub struct Model {
     pub primitives: Vec<Primitive>,
     pub materials: Vec<material::Material>,
-    pub textures: Vec<texture::Texture>,
     translation: Vec3,
     rotation_x: f32,
     rotation_y: f32,
@@ -151,15 +149,10 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(
-        primitives: Vec<Primitive>,
-        materials: Vec<material::Material>,
-        textures: Vec<texture::Texture>,
-    ) -> Self {
+    pub fn new(primitives: Vec<Primitive>, materials: Vec<material::Material>) -> Self {
         Model {
             primitives: primitives,
             materials: materials,
-            textures: textures,
             translation: Vec3 {
                 x: 0.0,
                 y: 0.0,

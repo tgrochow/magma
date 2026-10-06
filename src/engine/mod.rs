@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use vulkano::buffer::BufferUsage;
 use vulkano::buffer::allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo};
+use vulkano::command_buffer::PrimaryCommandBufferAbstract;
 use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer, RenderPassBeginInfo,
@@ -35,7 +36,7 @@ use vulkano::{Validated, VulkanError};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
-use crate::scene;
+use crate::scene::{self, texture};
 use crate::shader;
 
 mod config;
@@ -160,7 +161,31 @@ impl Engine {
         }
     }
 
-    pub fn draw(&mut self, scene: &scene::Scene, window_size: PhysicalSize<u32>) {
+    pub fn prepare_scene(&mut self, scene: &mut scene::Scene) {
+        let mut upload_builder = AutoCommandBufferBuilder::primary(
+            self.command_buffer_allocator.clone(),
+            self.queue.queue_family_index(),
+            CommandBufferUsage::OneTimeSubmit,
+        )
+        .unwrap();
+        for texture in &mut scene.textures {
+            texture.load_texture(
+                &mut upload_builder,
+                self.memory_allocator.clone(),
+                self.device.clone(),
+            );
+        }
+        let upload_command_buffer = upload_builder.build().unwrap();
+        upload_command_buffer
+            .execute(self.queue.clone())
+            .unwrap()
+            .then_signal_fence_and_flush()
+            .unwrap()
+            .wait(None)
+            .unwrap();
+    }
+
+    pub fn draw(&mut self, scene: &mut scene::Scene, window_size: PhysicalSize<u32>) {
         if window_size.width == 0 || window_size.height == 0 {
             return;
         }
@@ -201,7 +226,13 @@ impl Engine {
             .bind_pipeline_graphics(self.pipeline.clone())
             .unwrap();
         for (_key, model) in &scene.models {
-            self.draw_model(&mut builder, &model, &scene.camera, &scene.lighting);
+            self.draw_model(
+                &mut builder,
+                &model,
+                &scene.camera,
+                &scene.lighting,
+                &scene.textures,
+            );
         }
         builder.end_render_pass(Default::default()).unwrap();
         let command_buffer = builder.build().unwrap();
@@ -239,15 +270,17 @@ impl Engine {
         model: &scene::model::Model,
         camera: &scene::camera::Camera,
         lighting: &scene::light::Lighting,
+        textures: &Vec<texture::Texture>,
     ) {
         for primitive in &model.primitives {
             self.draw_primitive(
                 builder,
                 model,
-                &primitive,
+                primitive,
                 camera,
                 &model.materials[primitive.material_index],
-                &lighting,
+                lighting,
+                textures,
             );
         }
     }
@@ -260,6 +293,7 @@ impl Engine {
         camera: &scene::camera::Camera,
         material: &scene::material::Material,
         lighting: &scene::light::Lighting,
+        textures: &Vec<texture::Texture>,
     ) {
         let pos_buffer = primitive.create_vertex_buffer(&self.memory_allocator);
         let normals_buffer = primitive.create_normals_buffer(&self.memory_allocator);
@@ -288,11 +322,8 @@ impl Engine {
         };
         let point_lights_buffer = lighting.create_point_light_buffer(self.memory_allocator.clone());
         let dir_lights_buffer = lighting.create_dir_light_buffer(self.memory_allocator.clone());
-        let (texture_view, sampler) = model.textures[0].create_texture_buffer(
-            builder,
-            self.memory_allocator.clone(),
-            self.device.clone(),
-        );
+        let texture_view = textures[0].image_view.as_ref().unwrap().clone();
+        let sampler = textures[0].sampler.as_ref().unwrap().clone();
         let layout = &self.pipeline.layout().set_layouts()[0];
         let descriptor_set = DescriptorSet::new(
             self.descriptor_set_allocator.clone(),
