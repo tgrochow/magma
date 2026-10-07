@@ -322,8 +322,9 @@ impl Engine {
         };
         let point_lights_buffer = lighting.create_point_light_buffer(self.memory_allocator.clone());
         let dir_lights_buffer = lighting.create_dir_light_buffer(self.memory_allocator.clone());
-        let texture_view = textures[0].image_view.as_ref().unwrap().clone();
-        let sampler = textures[0].sampler.as_ref().unwrap().clone();
+        let texture_index = material.color_texture_index;
+        let texture_view = textures[texture_index].image_view.as_ref().unwrap().clone();
+        let sampler = textures[texture_index].sampler.as_ref().unwrap().clone();
         let layout = &self.pipeline.layout().set_layouts()[0];
         let descriptor_set = DescriptorSet::new(
             self.descriptor_set_allocator.clone(),
@@ -339,6 +340,7 @@ impl Engine {
         )
         .unwrap();
         let push_constants = shader::pbr_fs::PushConstantData {
+            useColorTexture: material.use_color_texture,
             materialColor: material.color,
             materialMettalic: material.mettalic,
             materialRoughness: material.roughness,

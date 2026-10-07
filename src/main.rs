@@ -102,7 +102,7 @@ impl ApplicationHandler for App {
                     .models
                     .get_mut("fox01")
                     .unwrap()
-                    .rotate(0.0, 0.015, 0.0);
+                    .rotate(0.0, 0.01, 0.0);
                 if state.fps_updated.elapsed().as_secs() >= 3 {
                     let fps = state.engine.get_fps();
                     if fps > 0 {

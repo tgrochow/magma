@@ -35,6 +35,7 @@ layout(std430, set = 0, binding = 3) readonly buffer DirLightBuffer
 layout(set = 0, binding = 4) uniform sampler2D pbr_base_color_texture;
 
 layout(push_constant) uniform PushConstantData {
+    bool useColorTexture;
     vec4 materialColor;
     float materialMettalic;
     float materialRoughness;
@@ -101,8 +102,12 @@ vec3 calcColor(vec3 base_color, vec3 N, vec3 V, vec3 L, float attenuation, vec3 
 }
 
 void main() {
-    // vec4 base_color = params.materialColor
-    vec4 base_color = texture(pbr_base_color_texture, v_texture_coords);
+    vec4 base_color;
+    if (params.useColorTexture) {
+        base_color = texture(pbr_base_color_texture, v_texture_coords);
+    } else {
+        base_color = params.materialColor;
+    }
     vec3 N = normalize(v_normal);
     vec3 V = normalize(camera.pos - world_pos);
     vec3 accColor = vec3(0.0, 0.0, 0.0);
