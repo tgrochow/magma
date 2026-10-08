@@ -433,7 +433,7 @@ fn create_framebuffers_without_msaa(
                     memory_allocator.clone(),
                     ImageCreateInfo {
                         image_type: ImageType::Dim2d,
-                        format: Format::D16_UNORM,
+                        format: Format::D32_SFLOAT,
                         extent: image.extent(),
                         usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT
                             | ImageUsage::TRANSIENT_ATTACHMENT,
@@ -483,7 +483,7 @@ fn create_render_pass_without_msaa(
                 store_op: Store,
             },
             depth_stencil: {
-                format: Format::D16_UNORM,
+                format: Format::D32_SFLOAT,
                 samples: 1,
                 load_op: Clear,
                 store_op: DontCare,

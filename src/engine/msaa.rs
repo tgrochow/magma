@@ -30,7 +30,7 @@ pub fn create_render_pass(
                 store_op: Store,
             },
             depth_stencil: {
-                format: Format::D16_UNORM,
+                format: Format::D32_SFLOAT,
                 samples: sample_count,
                 load_op: Clear,
                 store_op: DontCare,
@@ -59,7 +59,7 @@ pub fn create_framebuffers(
                     memory_allocator.clone(),
                     ImageCreateInfo {
                         image_type: ImageType::Dim2d,
-                        format: Format::D16_UNORM,
+                        format: Format::D32_SFLOAT,
                         extent: image.extent(),
                         usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT
                             | ImageUsage::TRANSIENT_ATTACHMENT,
